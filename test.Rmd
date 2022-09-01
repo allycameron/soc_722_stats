@@ -2,8 +2,7 @@
 title: "Untitled"
 author: "Allyson Cameron"
 date: "2022-09-01"
-output: 
-  pdf_document:
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
