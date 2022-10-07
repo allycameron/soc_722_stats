@@ -1,0 +1,866 @@
+---
+title: "SR Chapter 5"
+author: "Allyson Cameron"
+date: "2022-10-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Let's load everything we might need first. 
+```{r}
+library(rethinking)
+library(tidybayes)
+library(tidybayes.rethinking)
+library(tidyverse)
+library(splines)
+library(patchwork)
+library(janitor)
+library(corrr)
+```
+#### "Easy" Questions\
+**5E1. Which of the linear models below are multiple linear regressions?**
+$$
+\begin{align}
+(1) \mu_i &= \alpha + \beta x_i\\
+(2) \mu_i &= \beta_xx_i + \beta_zz_i\\
+(3) \mu_i &= \alpha + \beta(x_i − z_i)\\
+(4) \mu_i &= \alpha + \beta_xx_i + \beta_zz_i\\
+\end{align}
+$$
+\
+2  and 4 are multiple linear regressions because there are multiple explanatory variables (x and z) with their own slopes. 2 is slightly confusing because there is no alpha, but in my mind I am counting this as $\alpha$ = 0. This would still make this a multiple linear regression. I'm reading 3 as if $\beta$ has been distributed across both $x_i and z_i$. What is causing me some confusion is that there is going to be the same slope for both x and z, would this matter? I believe it does and have not included this in my answer. \ 
+
+**5E2. Write down a multiple regression to evaluate the claim: Animal diversity is linearly related to latitude, but only after controlling for plant diversity. You just need to write down the model definition.**\
+
+I believe the model definition means that we will just be making some equation like above. Let me explain how I am walking through this. We have two explanatory variables (animal diversity - A  and plant diversity - P) for latitude (L). Since we don't know that our intercept is, I think my graph will mirror something like (4) from above. I will also include the likelihood. \
+$$
+\begin{align}
+L_i &\sim (\mu_i, \sigma)\\
+\mu_i &= \alpha + \beta_AA_i + \beta_PP_i\\
+\end{align}
+$$
+
+**5E3. Write down a multiple regression to evaluate the claim: Neither amount of funding nor size of laboratory is by itself a good predictor of time to PhD degree; but together these variables are both positively associated with time to degree. Write down the model definition and indicate which side of zero each slope parameter should be on.**\
+This one is a little confusing for me, I was trying to create a DAG to understand the relationship and ended up with something like
+$$funding \rightarrow time \leftarrow size$$
+making time the colliding variable. This wouldn't make sense because time is not another explanatory variable but the dependent variable. The closest thing I see to what I am envisioning is on page 143. I would love more help understanding the causal model and what that would mean we manipulate or control for. It seems there is no relationship between size or funding from this question and that is what has lead to my confusion.\
+
+Anyways, I know that since there is a positive relationship between both explanatory variables in relation to time of degree, both slop parameters should be positive. 
+
+Our model definition should look like this:
+$$
+\begin{align}
+T_i &\sim Normal(\mu_i, \sigma) \\
+\mu_i &= \alpha + \beta_FF_i + \beta_SS_i\\
+\end{align}
+$$
+**5E4. Suppose you have a single categorical predictor with 4 levels (unique values), labeled A, B, C and D. Let $A_i$ be an indicator variable that is 1 where case $i$ is in category A. Also suppose $B_i$, $C_i$, and $D_i$ for the other categories. Now which of the following linear models are inferentially equivalent ways to include the categorical variable in a regression? Models are inferentially equivalent when it’s possible to compute one posterior distribution from the posterior distribution of another model.**\
+$$
+\begin{align}
+(1) \mu_i &= \alpha + \beta_AA_i + \beta_BB_i + \beta_DD_i\\
+(2) \mu_i &= \alpha + \beta_AA_i + \beta_BB_i + \beta_CC_i + \beta_DD_i\\
+(3) \mu_i &= \alpha + \beta_BB_i + \beta_CC_i + \beta_DD_i\\
+(4) \mu_i &= \alpha_AA_i + \alpha_BB_i + \alpha_CC_i + \alpha_DD_i\\
+(5) \mu_i &= \alpha_A(1 − B_i − C_i − D_i) + \alpha_BB_i + \alpha_CC_i + \alpha_DD_i\\
+\end{align}
+$$
+In (1), C takes on the reference category, in (2) all of the levels are present so I am not quite sure what the alpha represents but from your help on the discussion board I realize this is redundant and most likely not inferentially equivalent. In (3) A is taking on the reference category. In (4) and (5) they are coding four levels explicitly allowing them to also be inferentially equivalent. With just the alphas or the differences among the alphas, we are able to produce  the expected values and we can get the same result.  
+
+So, (1), (3), (4), and (5) are inferentially equivalent. 
+
+
+#### Medium Questions\
+**5M1. Invent your own example of a spurious correlation. An outcome variable should be correlated with both predictor variables. But when both predictors are entered in the same model, the correlation between the outcome and one of the predictors should mostly vanish (or at least be greatly reduced).**\
+
+I'm going to do a relationship between dancing at a party (D), puking (P), and alcohol consumption(A). 
+```{r}
+# let's make a DAG first.
+
+# checking conditional independencies
+PAD_dag1 <- dagitty("dag{P<-A->D}")
+impliedConditionalIndependencies(PAD_dag1)
+# there are none, so we see that there is no output
+
+# load package needed to create tidy DAG
+library(ggdag)
+
+dag_coords <-
+  tibble(
+    name = c("A", "D", "P"),
+    x = c(1, 3, 2),
+    y = c(2, 2, 1)
+  )
+
+p1 <-
+  dagify(D ~ A, P ~ A + D,
+    coords = dag_coords
+  ) %>%
+  ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_dag_point(color = "blue4", alpha = 1 / 4, size = 10) +
+  geom_dag_text(color = "cornflowerblue") +
+  geom_dag_edges(edge_color = "blue4") +
+  scale_x_continuous(NULL, breaks = NULL, expand = c(0.1, 0.1)) +
+  scale_y_continuous(NULL, breaks = NULL, expand = c(0.2, 0.2)) +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  labs(
+    title = "DAG for spurious correlation question",
+    subtitle = "between Dancing (D), Puking (P), and Alcohol Consumption (A)"
+  )
+
+p1
+```
+
+As you can see, in our DAG we assume that alcohol consumption causes both dancing and puking, and dancing causes puking.\
+
+Next, we can simulate a model. However, since we do not have code for tidy I will use the code from the book. I will try to ask in class how to do this as tidy code.\
+
+Let's start by creating our model definition with priors defined. I will just use the ones from the book as he explains in the video that these are a good start. 
+
+$$
+\begin{align}
+Puking_i &\sim Normal(\mu_i, \sigma)\\
+\mu_i &= \alpha + \beta_{Dancing}Dancing_i + \beta_{Alcohol}Alcohol_i\\
+\alpha &\sim Normal(0, 0.2)\\
+\beta_{Dancing} &\sim Normal(0, 0.5)\\
+\beta_{Alcohol} &\sim Normal(0, 0.5)\\
+\sigma &\sim Exponential(1)
+\end{align}
+$$
+
+Now let's simulate our variables and model.
+
+```{r}
+# first let simulate the variables; code 5.12 on page 134.. but as a tibble
+N <- 100 # let's do 100 simulations
+d <- tibble(
+  A = rnorm(N, mean = 0, sd = 1),
+  D = rnorm(N, mean = A, sd = 1),
+  P = rnorm(N, mean = A, sd = 1)) %>% # simulating that A influences P only
+  mutate(across(c(A,D,P),
+                ~ (.x - mean(.x)) / sd(.x))) # standardizing to z scores
+```
+First, we will look at the correlation between Dancing and Puking
+$$
+\begin{align}
+Puking_i &\sim Normal(\mu_i, \sigma)\\
+\mu_i &= \alpha + \beta_{Dancing}Dancing_i \\
+\alpha &\sim Normal(0, 0.2)\\
+\beta_{Dancing} &\sim Normal(0, 0.5)\\
+\sigma &\sim Exponential(1)
+\end{align}
+$$
+
+```{r}
+
+# start with just fitting puking and dancing
+DP_sim <- quap(
+  alist(
+    P ~ dnorm(mu, sigma),
+    mu <- a + bD * D,
+    a ~ dnorm(0, 0.2),
+    bD ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ),
+  data = d
+)
+precis(DP_sim)
+```
+$$
+\begin{align}
+Puking_i &\sim Normal(\mu_i, \sigma)\\
+\mu_i &= \alpha + \beta_{Alcohol}Alcohol_i \\
+\alpha &\sim Normal(0, 0.2)\\
+\beta_{Alcohol} &\sim Normal(0, 0.5)\\
+\sigma &\sim Exponential(1)
+\end{align}
+$$
+
+```{r}
+# now fit puking and alcohol consumption
+
+AP_sim <- quap(
+  alist(
+    P ~ dnorm(mu, sigma),
+    mu <- a + bA * A,
+    a ~ dnorm(0, 0.2),
+    bA ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ),
+  data = d
+)
+precis(AP_sim)
+```
+Now, we go back to our original model:
+$$
+\begin{align}
+Puking_i &\sim Normal(\mu_i, \sigma)\\
+\mu_i &= \alpha + \beta_{Dancing}Dancing_i + \beta_{Alochol}Alochol_i\\
+\alpha &\sim Normal(0, 0.2)\\
+\beta_{Dancing} &\sim Normal(0, 0.5)\\
+\beta_{Alochol} &\sim Normal(0, 0.5)\\
+\sigma &\sim Exponential
+\end{align}
+$$
+Here's the code to simulate that.
+
+```{r}
+# now let's simulate our entire model using puking, dancing, and alcohol
+PAD_sim <- quap(
+  alist(
+    P ~ dnorm(mu, sigma),
+    mu <- a + bD * D + bA * A,
+    a ~ dnorm(0, 0.2),
+    bD ~ dnorm(0, 0.5),
+    bA ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ),
+  data = d
+)
+precis(PAD_sim)
+```
+
+Now, let's visualize these simulated results. I would use the code from the bookdown website, but it create its variables for ggplot using `brm` which we are not allowed to use. So instead I will use the code from the book. 
+```{r}
+# now let's plot and compare, again going to original code
+
+plot(coeftab(DP_sim, AP_sim, PAD_sim), par = c("bA", "bD"), xlab = "Estimate")
+
+# plot with the help of pablo doing in tidy way
+models <- list(DP = DP_sim, 
+                 AP = AP_sim,
+                 PAD = PAD_sim)
+  
+  # Function to extract coefficients
+  coef_tbl <- 
+    lapply(1:length(models),function(x){
+    tbl <- precis(models[[x]]) # Mean and compatibility intervals for coef
+    model <- names(models)[x] # The name of the model the coefs are coming from
+   
+    # Put it together and return it
+     tbl %>%
+      as_tibble() %>%
+      mutate(coef = rownames(tbl),
+             model = model) %>% 
+      relocate(model,coef)
+    }) %>% 
+    bind_rows()
+  
+# adding this so my graph only shows the two things I need
+  coef_tbl <- coef_tbl %>%
+    filter(coef == "bA" | coef == "bD")
+  
+  # Plot the coefficients, changed code to make it mirror OG model more
+  coef_tbl %>%
+  ggplot(aes(mean, model, color = model)) +
+  geom_point() +
+  geom_linerange(aes(xmin = `5.5%`, xmax = `94.5%`)) +
+  geom_vline(aes(xintercept = 0), color = "red") +
+  facet_wrap(~coef, nrow = 3) +
+  theme(legend.position = "none") +
+  xlim(-3, 3)
+  
+  # trying the version from class
+  
+DP_post <- tidy_draws(DP_sim, n = 1e4) %>%  
+  select(bD)
+AP_post <- tidy_draws(AP_sim, n = 1e4) %>%  
+  select(bA)
+PAD_post <- tidy_draws(PAD_sim, n = 1e4) %>%  
+  select(bA, bD)
+
+
+PAD_longpost <- PAD_post %>% 
+  pivot_longer(everything(),
+               names_to = "term",
+               values_to = "values")
+
+PAD_postsum <- PAD_longpost |>
+  group_by(term) |> 
+  summarize(mean = mean(values),
+            lb = quantile(values, .055),
+            ub = quantile(values, .945)) %>%
+  mutate(model = "PAD")
+
+AP_longpost <- AP_post %>%  
+  pivot_longer(everything(),
+               names_to = "term",
+               values_to = "values")
+
+AP_postsum <- AP_longpost |>
+  group_by(term) |> 
+  summarize(mean = mean(values),
+            lb = quantile(values, .055),
+            ub = quantile(values, .945)) %>%
+  mutate(model = "AP")
+
+
+DP_longpost <- DP_post %>% 
+  pivot_longer(everything(),
+               names_to = "term",
+               values_to = "values")
+
+DP_postsum <- DP_longpost |>
+  group_by(term) |> 
+  summarize(mean = mean(values),
+            lb = quantile(values, .055),
+            ub = quantile(values, .945)) %>%
+  mutate(model = "DAP")
+
+# this is my way of adding all of the values I need together for my plot
+postsum <- full_join(DP_postsum, AP_postsum, by = c("model", "lb", "ub", "mean", "term")) 
+postsum <- full_join(postsum, PAD_postsum, by = c("model", "lb", "ub", "mean", "term")) 
+
+ggplot(postsum,
+       aes(mean, model, color = model,
+           xmin = lb,
+           xmax = ub)) +
+  geom_point(size = 2) +
+  geom_linerange(size = 1) +
+  geom_vline(xintercept = 0,
+             color = "gray") +
+  xlim(-2,2) +
+  labs(x = "Estimate",
+       y = "") +   facet_wrap(~term, nrow = 3) 
+
+```
+
+bA, the posterior mean for alcohol consumption rate, does not really move, instead it grows more uncertain because the confidence interval is larger. I'm not quite sure what this means, but it seems like it means that alcohol and puking have a similar association even when dancing is in the picture. However, bD is only associated with puking when alcohol is missing from the model. (When alcohol isn't present in the model it makes it seem like there is a strong positive association between the two when there actually isn't, which you can see when ). Therefore, dancing at a party is predictive but not causal in relation to puking. The association between dancing at a party and puking is spurious and our graph implies that there is no important direct causal path from dancing to puking, which makes sense. Instead it is because of their common relationship with alcohol consumption. Therefore our DAG should really look something like this.
+```{r}
+dag_coords2 <-
+  tibble(
+    name = c("A", "D", "P"),
+    x = c(1, 3, 2),
+    y = c(2, 2, 1)
+  )
+
+p2 <-
+  dagify(D ~ A, P ~ A,
+    coords = dag_coords2
+  ) %>%
+  ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_dag_point(color = "blue4", alpha = 1 / 4, size = 10) +
+  geom_dag_text(color = "cornflowerblue") +
+  geom_dag_edges(edge_color = "blue4") +
+  scale_x_continuous(NULL, breaks = NULL, expand = c(0.1, 0.1)) +
+  scale_y_continuous(NULL, breaks = NULL, expand = c(0.2, 0.2)) +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  labs(
+    title = "Final DAG",
+    subtitle = "between Dancing (D), Puking (P), and Alcohol Consumption (A)"
+  )
+
+p2
+```
+
+**5M2. Invent your own example of a masked relationship. An outcome variable should be correlated with both predictor variables, but in opposite directions. And the two predictor variables should be correlated with one another.**\
+I am going to be doing the relationship between family size (S), family income (I), and child education attainment (E). First, let's start with showing this relationship with a DAG. I am not sure which way the relationship between family income and family size goes, but for this model I will posit that family income influences family size. Since I am not sure how to show signs in a DAG, I will write them here. S (-) E, I (+) E, S (-) I
+```{r}
+# let's make a DAG first.
+
+# checking conditional independencies
+IES_dag1 <- dagitty("dag{S<-I->E<-S}")
+impliedConditionalIndependencies(IES_dag1)
+# there are none, so we see that there is no output
+
+# load package needed to create tidy DAG
+library(ggdag)
+
+dag_coords3 <-
+  tibble(
+    name = c("S", "E", "I"),
+    x = c(1, 3, 2),
+    y = c(2, 2, 1)
+  )
+
+p3 <-
+  dagify(S ~ I, E ~ S, E ~ I,
+    coords = dag_coords3
+  ) %>%
+  ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_dag_point(color = "blue4", alpha = 1 / 4, size = 10) +
+  geom_dag_text(color = "cornflowerblue") +
+  geom_dag_edges(edge_color = "blue4") +
+  scale_x_continuous(NULL, breaks = NULL, expand = c(0.1, 0.1)) +
+  scale_y_continuous(NULL, breaks = NULL, expand = c(0.2, 0.2)) +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  labs(
+    title = "DAG for masked relationship question",
+    subtitle = paste0(
+      "between Family Size (S), Family Income (I), ",
+      "and Child's Education Attainment (E)"
+    )
+  )
+
+p3
+```
+
+Let's start by creating our model definition with priors defined. I will use the ones from the book again. 
+
+$$
+\begin{align}
+Education_i &\sim Normal(\mu_i, \sigma)\\
+\mu_i &= \alpha + \beta_{Size}Size + \beta_{Income}Income\\
+\alpha &\sim Normal(0, 0.2)\\
+\beta_{Size} &\sim Normal(0, 0.5)\\
+\beta_{Income} &\sim Normal(0, 0.5)\\
+\sigma &\sim Exponential(1)
+\end{align}
+$$
+
+Now let's simulate our variables and model.
+In both cases, when we have all predictors in the model the estimates move apart. (This is the top lin in bI and bS). This means that they both have a stronger association when they are in the same model, showing that the two variables are correlated with the outcome but in different directions. 
+
+```{r}
+# first let simulate the variables; code 5.42 on page 152
+n <- 100 # let's do 100 simulations
+d2 <- tibble(
+  I = rnorm(n, mean = 0, sd = 1),
+  S = rnorm(n, mean = I, sd = 1),
+  E = rnorm(n, mean = I - S, sd = 1)) %>%
+   mutate(across(c(I,S,E),
+                ~ (.x - mean(.x)) / sd(.x))) # standardizing to z scores
+```
+First, we will look at the correlation between Size and Education
+$$
+\begin{align}
+Education_i &\sim Normal(\mu_i, \sigma)\\
+\mu_i &= \alpha + \beta_{Size}Size \\
+\alpha &\sim Normal(0, 0.2)\\
+\beta_{Size} &\sim Normal(0, 0.5)\\
+\sigma &\sim Exponential(1)
+\end{align}
+$$
+
+```{r}
+# start with just fitting child educaction and family size
+ES_sim <- quap(
+  alist(
+    E ~ dnorm(mu, sigma),
+    mu <- a + bS * S,
+    a ~ dnorm(0, 0.2),
+    bS ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ),
+  data = d2
+)
+precis(ES_sim)
+```
+Now for Income and Education.\
+$$
+\begin{align}
+Education_i &\sim Normal(\mu_i, \sigma)\\
+\mu_i &= \alpha + \beta_{Income}Income_i \\
+\alpha &\sim Normal(0, 0.2)\\
+\beta_{Income} &\sim Normal(0, 0.5)\\
+\sigma &\sim Exponential(1)
+\end{align}
+$$
+
+```{r}
+# now fit child education and income
+
+EI_sim <- quap(
+  alist(
+    E ~ dnorm(mu, sigma),
+    mu <- a + bI * I,
+    a ~ dnorm(0, 0.2),
+    bI ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ),
+  data = d2
+)
+precis(EI_sim)
+```
+Now, again, we go back to our original model:\
+$$
+\begin{align}
+Education_i &\sim Normal(\mu_i, \sigma)\\
+\mu_i &= \alpha + \beta_{Size}Size_i + \beta_{Income}Income_i\\
+\alpha &\sim Normal(0, 0.2)\\
+\beta_{Size} &\sim Normal(0, 0.5)\\
+\beta_{Income} &\sim Normal(0, 0.5)\\
+\sigma &\sim Exponential(1)
+\end{align}
+$$
+Here's the code to simulate that.\
+
+```{r}
+# now let's simulate our entire model using  education, size, and income
+IES_sim <- quap(
+  alist(
+    E ~ dnorm(mu, sigma),
+    mu <- a + bS * S + bI * I,
+    a ~ dnorm(0, 0.2),
+    bS ~ dnorm(0, 0.5),
+    bI ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ),
+  data = d2
+)
+precis(IES_sim)
+```
+Again, let's visually compare these models. 
+
+```{r}
+
+# my original plot
+plot(coeftab(ES_sim, EI_sim, IES_sim), pars = c("bI", "bS"))
+
+# plot with the help of pablo doing in tidy way
+models <- list(ES = ES_sim, 
+                 EI = EI_sim,
+                 IES = IES_sim)
+  
+  # Function to extract coefficients
+  coef_tbl <- 
+    lapply(1:length(models),function(x){
+    tbl <- precis(models[[x]]) # Mean and compatibility intervals for coef
+    model <- names(models)[x] # The name of the model the coefs are coming from
+   
+    # Put it together and return it
+     tbl %>%
+      as_tibble() %>%
+      mutate(coef = rownames(tbl),
+             model = model) %>% 
+      relocate(model,coef)
+    }) %>% 
+    bind_rows()
+  
+# adding this so my graph only shows the two things I need
+  coef_tbl <- coef_tbl %>%
+    filter(coef == "bI" | coef == "bS")
+  
+  # Plot the coefficients, changed code to make it mirror OG model more
+  coef_tbl %>%
+  ggplot(aes(mean, model, color = model)) +
+  geom_point() +
+  geom_linerange(aes(xmin = `5.5%`, xmax = `94.5%`)) +
+  geom_vline(aes(xintercept = 0), color = "red") +
+  facet_wrap(~coef, nrow = 3) +
+  theme(legend.position = "none")
+  
+  
+  # again going to try workflow from class
+  
+ES_post <- tidy_draws(ES_sim, n = 1e4) %>%  
+  select(bS)
+EI_post <- tidy_draws(EI_sim, n = 1e4) %>%  
+  select(bI)
+IES_post <- tidy_draws(IES_sim, n = 1e4) %>%  
+  select(bS, bI)
+
+
+IES_longpost <- IES_post %>% 
+  pivot_longer(everything(),
+               names_to = "term",
+               values_to = "values")
+
+IES_postsum <- IES_longpost |>
+  group_by(term) |> 
+  summarize(mean = mean(values),
+            lb = quantile(values, .055),
+            ub = quantile(values, .945)) %>%
+  mutate(model = "IES")
+
+EI_longpost <- EI_post %>%  
+  pivot_longer(everything(),
+               names_to = "term",
+               values_to = "values")
+
+EI_postsum <- EI_longpost |>
+  group_by(term) |> 
+  summarize(mean = mean(values),
+            lb = quantile(values, .055),
+            ub = quantile(values, .945)) %>%
+  mutate(model = "EI")
+
+
+ES_longpost <- ES_post %>% 
+  pivot_longer(everything(),
+               names_to = "term",
+               values_to = "values")
+
+ES_postsum <- ES_longpost |>
+  group_by(term) |> 
+  summarize(mean = mean(values),
+            lb = quantile(values, .055),
+            ub = quantile(values, .945)) %>%
+  mutate(model = "ES")
+
+# this is my way of adding all of the values I need together for my plot
+postsum <- full_join(ES_postsum, EI_postsum, by = c("model", "lb", "ub", "mean", "term")) 
+postsum <- full_join(postsum, IES_postsum, by = c("model", "lb", "ub", "mean", "term")) 
+
+ggplot(postsum,
+       aes(mean, model, color = model,
+           xmin = lb,
+           xmax = ub)) +
+  geom_point(size = 2) +
+  geom_linerange(size = 1) +
+  geom_vline(xintercept = 0,
+             color = "gray") +
+  xlim(-2,2) +
+  labs(x = "Estimate",
+       y = "") +   facet_wrap(~term, nrow = 3) 
+
+```
+
+We can now see here that with both bI and bS, there is a strong association when all variables are present in the model (see the top lines in both). We can see the lines are moving away from each other. This means that both related to the outcome variable (E), but one positively (bI) and one negatively (bS).\
+
+**5M3. It is sometimes observed that the best predictor of fire risk is the presence of firefighters— States and localities with many firefighters also have more fires. Presumably firefighters do not cause fires. Nevertheless, this is not a spurious correlation. Instead fires cause firefighters. Consider the same reversal of causal inference in the context of the divorce and marriage data. How might a high divorce rate cause a higher marriage rate? Can you think of a way to evaluate this relationship, using multiple regression?**\
+
+If people get divorced more, they may also then get married more just a second time. Therefore, let's add this variable to the model (remarriage) and flip divorce to an explanatory variable and marriage as a dependent variable.(Since I have not learned about mediating relationships yet in a model this is just my rough idea of what would occur, not including priors). Additionally, here is a DAG.\ 
+$$
+\begin{align}
+M_i &\sim Normal(\mu_i,\sigma)\\
+\mu_i &= \alpha + \beta_DDi + \beta_RR_i\\
+\end{align}
+$$
+
+```{r}
+
+dag_coords3 <-
+  tibble(
+    name = c("M", "D", "R"),
+    x = c(3, 1, 2),
+    y = c(2, 2, 2)
+  )
+
+p4 <-
+  dagify(M ~ R, R ~ D,
+    coords = dag_coords3
+  ) %>%
+  ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_dag_point(color = "blue4", alpha = 1 / 4, size = 10) +
+  geom_dag_text(color = "cornflowerblue") +
+  geom_dag_edges(edge_color = "blue4") +
+  scale_x_continuous(NULL, breaks = NULL, expand = c(0.1, 0.1)) +
+  scale_y_continuous(NULL, breaks = NULL, expand = c(0.2, 0.2)) +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  labs(
+    title = "DAG for reversed causal relationship question",
+    subtitle = paste0(
+      "between Marriage rate (M), ",
+      "Re-marriage rate (R), and Divorce rate (D)" 
+    )
+  )
+# what's confusing for me though is if re-marriage rates would be 
+# compiled into marriage rates? In my model I will say it does, but would it?
+
+p4
+
+
+```
+
+This creates a DAG where remarriage is the mediating variable causing divorce to have a higher divorce rate. From this we could run a multiple linear regression with remarriage rate and divorce rate as the explanatory variables and marriage rate as the dependent variable, thus exploring the reverse causal relationship.\
+
+**5M4. In the divorce data, States with high numbers of members of the Church of Jesus Christ of Latter-day Saints (LDS) have much lower divorce rates than the regression models expected. Find a list of LDS population by State and use those numbers as a predictor variable, predicting divorce rate using marriage rate, median age at marriage, and percent LDS population (possibly standardized). You may want to consider transformations of the raw percent LDS variable.**\
+
+First, let's load in data from https://worldpopulationreview.com/state-rankings/mormon-population-by-state. 
+
+```{r}
+LDS_data <- read.csv("/Users/allysoncameron/Desktop/soc_722_stats/Data/LDS.csv")
+
+# creating percentage and selecting only state and %
+LDS_data <- LDS_data %>% 
+  mutate(percent_lds = mormonPop/Pop) %>%  
+  select(State, percent_lds) 
+
+# let's look at the percentages
+ggplot(LDS_data, aes(x = percent_lds)) + geom_density()
+
+# let's log percentage of Mormons and see if this changes
+LDS_data <- LDS_data %>% 
+  mutate(log_percent_lds = log(percent_lds)) %>% 
+  select(State, log_percent_lds)
+
+ggplot(LDS_data, aes(x = log_percent_lds)) + geom_density()
+
+
+# standardizing percentage to z scores
+LDS_data <- LDS_data %>% 
+  mutate(across(c(log_percent_lds),
+                ~ (.x - mean(.x)) / sd(.x))) 
+```
+Now, let's load in the `WaffleDivorce` data. \
+
+```{r}
+data("WaffleDivorce")
+waffle <- WaffleDivorce %>% 
+  mutate(State = Location) %>% 
+  mutate(across(c(MedianAgeMarriage, Marriage, Divorce),
+                ~ (.x - mean(.x)) / sd(.x))) %>% 
+  select(State, MedianAgeMarriage, Marriage, Divorce)
+
+```
+Let's join our data together. \
+
+```{r}
+d5 <- full_join(waffle, LDS_data, by = "State") %>% 
+  drop_na() %>% # Nevada and D.C. had NAs so let's drop those
+  rename(M = Marriage) %>% 
+  rename(D = Divorce) %>% 
+  rename(A = MedianAgeMarriage) %>% 
+  rename(L = log_percent_lds)
+```
+Now, let's create our model definition. \
+
+$$
+\begin{align}
+D_i &\sim Normal(\mu, \sigma)\\
+\mu_i &= \alpha + \beta_LL_i + \beta_MM_i + \beta_AA_i\\
+\alpha &\sim Normal(0,0.2) \\
+\beta_L &\sim Normal(0,0.5) \\
+\beta_M &\sim Normal(0,0.5) \\
+\beta_A &\sim Normal(0,0.5) \\
+\sigma &\sim Exponential(1)
+\end{align}
+$$
+
+Now, let's do it in code and create quadratic approximation
+```{r}
+mormon_sim <- quap(
+  alist(
+    D ~ dnorm(mu, sigma),
+    mu <- a + bL * L + bM * M + bA * A,
+    a ~ dnorm(0, 0.2),
+    bL ~ dnorm(0, 0.5),
+    bM ~ dnorm(0, 0.5),
+    bA ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ),
+  data = d5
+)
+precis(mormon_sim)
+
+# get samples
+m_post <- tidy_draws(mormon_sim, n = 1e4) %>% 
+  select(bL, bM, bA)
+
+# prepping to plot
+
+m_longpost <- m_post %>% 
+  pivot_longer(everything(),
+               names_to = "term",
+               values_to = "values")
+
+m_postsum <- m_longpost%>% 
+  group_by(term) %>% 
+  summarize(mean = mean(values), # taking means of the sampled parameters
+            lb = quantile(values, .055),
+            ub = quantile(values, .945))
+
+
+
+# plotting
+
+ggplot(m_postsum,
+       aes(y = term,
+           x = mean,
+           xmin = lb,
+           xmax = ub)) +
+  geom_point(size = 2) +
+  geom_linerange(size = 1) +
+  geom_vline(xintercept = 0,
+             color = "gray") +
+  xlim(-2,2) +
+  labs(x = "Estimate",
+       y = "", 
+       title = "Correlation Coefficients to Divorce",
+      subtitle = "when Marriage, Age of Marriage, and % of Mormons are used")
+```
+
+Like before, we see that marriage and divorce do not have a strong association while divorce and age of marriage do have a strong negative association. What is interesting is that we are now also able to see that divorce and percentage of LDS population *do* have a strong negative association like the question suggested.\
+
+**5M5. One way to reason through multiple causation hypotheses is to imagine detailed mechanisms through which predictor variables may influence outcomes. For example, it is sometimes argued that the price of gasoline (predictor variable) is positively associated with lower obesity rates (outcome variable). However, there are at least two important mechanisms by which the price of gas could reduce obesity. First, it could lead to less driving and therefore more exercise. Second, it could lead to less driving, which leads to less eating out, which leads to less consumption of huge restaurant meals. Can you outline one or more multiple regressions that address these two mechanisms? Assume you can have any predictor data you need.**\
+
+
+Let's start by creating DAGs that show each relationship of gasoline (G), obesity rates (O), amount of driving (D), exercise (E), eating out (we'll label as fast food - F). 
+
+(assuming we have this stuff available somehow)
+G = gasoline will be measured by prices
+O = obesity rates by county
+D = average amount of driving done 
+E = amount of times people go to the gym
+F =  fast food stops per week
+
+```{r}
+dag_coords6 <-
+  tibble(
+    name = c("G", "D", "E", "F", "O"),
+    x = c(G = 1, D = 2, E = 3, F = 3, O = 5),
+    y = c(G = 2, D = 2, E = 1, F = 3, O = 2)
+  )
+
+p6 <-
+  dagify(D ~ G, E ~ D, F ~ D,O ~ E + F, 
+    coords = dag_coords6
+  ) %>%
+  ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_dag_point(color = "blue4", alpha = 1 / 4, size = 10) +
+  geom_dag_text(color = "cornflowerblue") +
+  geom_dag_edges(edge_color = "blue4") +
+  scale_x_continuous(NULL, breaks = NULL, expand = c(0.1, 0.1)) +
+  scale_y_continuous(NULL, breaks = NULL, expand = c(0.2, 0.2)) +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  labs(
+    title = "DAG for multiple causal relationship question",
+    subtitle = paste0(
+      "between price of Gas (G), amount of driving (D) ",
+      ", fast food (F), exercise completed (E), and obesity rate (O)" 
+    )
+  )
+
+p6 
+```
+
+Here is how I would assign signs:\
+ G -> D (-): higher gas price lower amount of time driving\
+ D -> E (-): lower amount of time driving, more exercise\
+ E -> O (-): more exercise, less obesity\
+ D -> F (+): lower amount of time driving, lower rates of people eating out\
+ F -> O (+): less people eating out, less obesity\
+
+
+Additionally, I think my equation process would look something like this:\
+First, I'd start with the assumed relationship. 
+
+$$
+\begin {align}
+O_i &= Normal(\mu_i, \sigma)\\
+\mu_i &\sim \alpha + \beta_GG_i \\
+\end{align}
+$$
+then check each path 
+$$
+\begin {align}
+O_i &= Normal(\mu_i, \sigma)\\
+\mu_i &\sim \alpha + \beta_GG_i + \beta_DD_i + \beta_EE_i\\
+\end{align}
+$$
+and 
+$$
+\begin {align}
+O_i &= Normal(\mu_i, \sigma)\\
+\mu_i &\sim \alpha +\beta_GG_i \ + \beta_DD_i + \beta_FF_i \\
+\end{align}
+$$
+
+and finally the full model. 
+
+$$
+\begin {align}
+O_i &= Normal(\mu_i, \sigma)\\
+\mu_i &\sim \alpha +\beta_GG_i \ + \beta_DD_i + + \beta_EE_i + \beta_FF_i \\
+\end{align}
+$$
+
+I am assuming we should keep D and G with E and F because that is mechanistically how that part of the function works but we are seeing the differences between exercising or fast food as an impact on obesity. If the relationship from step one to checking the two paths is reduced instead of increased, then our beginnig assumption may be right. 
