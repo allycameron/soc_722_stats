@@ -815,7 +815,8 @@ p6 <-
     title = "DAG for multiple causal relationship question",
     subtitle = paste0(
       "between price of Gas (G), amount of driving (D) ",
-      ", fast food (F), exercise completed (E), and obesity rate (O)" 
+      ", fast food (F), exercise completed (E), 
+      and obesity rate (O)" 
     )
   )
 
