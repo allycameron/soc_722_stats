@@ -1,0 +1,321 @@
+---
+title: "Chapter 3 and 4 - Modern Dive"
+author: "Allyson Cameron"
+date: "2022-09-06"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# Chapter 3 
+
+First, lets load `tidyverse`, `readr`, `dplyr`, and `knitr` and load the data.
+
+```{r}
+library(tidyverse)
+library(readr)
+library(dplyr)
+library(knitr)
+mario_kart <-
+  read_csv(
+    paste0(
+      "/Users/allysoncameron/Documents/soc_722_stats/",
+      "Data/world_records.csv"
+    )
+  )
+glimpse(mario_kart)
+```
+
+### Question 1 
+
+Now let's filter out only the races with `"Three Lap"` and take out laps from `"Rainbow Road"`.
+
+```{r}
+three_laps <- mario_kart %>%
+  filter(type == "Three Lap" & track != "Rainbow Road")
+
+glimpse(three_laps)
+```
+
+Now, let's save a dataset that only contains the records achieved at Rainbow Road.
+
+```{r}
+rainbow_road <- mario_kart %>%
+  filter(type == "Three Lap" & track == "Rainbow Road")
+
+glimpse(rainbow_road)
+```
+
+### Question 2 
+
+Now, lets get the average `time` at Rainbow Road and the standard deviations.
+
+```{r}
+summary_rr <- rainbow_road %>%
+  
+  summarize(mean_time = mean(time, na.rm = TRUE),
+            sd_record_rr = sd(time, na.rm = TRUE))
+
+summary_rr
+```
+
+Let's do the same things for the other dataset with all of the other tracks.
+
+```{r}
+summary_three_laps <- three_laps %>%
+  summarize(mean_time_3 = mean(time, na.rm = TRUE),
+            sd_record__3 = sd(time, na.rm = TRUE))
+
+summary_three_laps
+```
+
+**Notice any differences?** The average time for Rainbow Road was significantly longer (275.63) than the average for all other tracks doing three-laps (113.80). Additionally, there is more variation in the times of the records at Rainbow Road (91.82) than at the other tracks with three-laps (52.98).
+
+### Question 3 
+
+Next we are going to create `three_laps_by_track` which will first look in `three_laps`, then (`%>%`), `group_by` tracks, then (`%>%`), `filter` to only count cases of individuals who actually currently hold a record, then (`%>%`), `summarize` to count how many different records have been established on each track. After this, I will arrange the counts in descending order so that I can see which track has the most records.
+
+```{r}
+three_laps_by_track <- three_laps %>%
+  group_by(track) %>%
+  filter(record_duration != 0) %>%
+  summarize(num_three_laps_records = n()) %>%
+  arrange(desc(num_three_laps_records))
+
+glimpse(three_laps_by_track)
+```
+
+Toad's Turnpike has the most, with 86 current records.
+
+### Question 4 
+
+Now we want to investigate if there are drivers who have multiple records at each track, and how many records they have.
+
+For this, we will be grouping by both driver and track.
+
+```{r}
+by_player_each_track <- three_laps %>%
+  group_by(player, track) %>%
+  filter(record_duration != 0) %>%
+  summarize(num_by_player_track = n()) %>%
+  arrange(desc(num_by_player_track))
+
+glimpse(by_player_each_track)
+```
+
+**Who is the player that has recorded the most records at any one track and what track was it?** Player Penev is the player who holds the most records overall (24) and this is on a track called Choco Mountain.
+
+### Question 5 
+
+Now, I will show you the best time recorded on each track by using `group_by`, `arrange`, and `slice` to see the first (best) time for each. I will also limit which columns show using `select`.
+
+```{r}
+best_time_by_track <- three_laps %>%
+  group_by(track) %>%
+  arrange(time) %>%
+  slice(1) %>%
+  select(track, time)
+
+glimpse(best_time_by_track)
+```
+
+### Question 6 
+
+Let's create a new variable that is a 1 if record_duration is higher than 100 or 0 otherwise.
+
+```{r}
+three_laps <- three_laps %>%
+  mutate(rec_duration_mod = as.numeric(three_laps$record_duration >= 100))
+
+glimpse(three_laps)
+```
+
+Now, let's look at the total amount of long-duration records each player holds.
+
+```{r}
+long_duration_by_player <- three_laps %>%
+  group_by(player) %>%
+  summarize(sum_rec_duration = sum(rec_duration_mod, na.rm = TRUE)) %>%
+  arrange(desc(sum_rec_duration))
+
+glimpse(long_duration_by_player) 
+```
+
+**What player has the most long-duration records?** Player MR has the most long-duration records (76).
+
+### Question 7 
+
+Now, lets import the a data set to join it with our `three_laps` dataset.
+
+```{r}
+drivers <-
+  read_csv(paste0(
+    "/Users/allysoncameron/Documents/soc_722_stats/",
+    "Data/drivers.csv"
+  ))
+glimpse(drivers)
+```
+
+Let's complete the join using `left_join`.
+
+```{r}
+# Let's take out year as it is information we already have.
+three_laps_drivers <- three_laps %>%
+  left_join(drivers, by = "player") %>%
+  select(-year)
+
+
+glimpse(three_laps_drivers)
+  
+```
+
+Lastly, let's try to plot a bar chart of number of records by country. Here are the countries and there corresponding codes for your reference.
+
+| Country        | Country Code |
+|----------------|:------------:|
+| Australia      |     AUS      |
+| Austria        |     AUT      |
+| Brazil         |     CAN      |
+| Canada         |     HRV      |
+| Germany        |     DEU      |
+| Ireland        |     IRL      |
+| Netherlands    |     NLD      |
+| Norway         |     NOR      |
+| Slovenia       |     SVN      |
+| United Kingdom |      UK      |
+| United States  |     USA      |
+
+```{r fig.align="center"}
+# Let's take out the NA values from nations
+three_laps_drivers %>%
+    filter(!is.na(nation)) %>% 
+  ggplot(aes(x = nation)) + 
+  geom_bar(fill = "chocolate3") + labs(x = "Nation (Using Country Code)",
+                                        y = "Number of Records", 
+                                      title = "Number of Records by Country") + 
+  scale_x_discrete(labels = c("AUS", "AUT", "BRA", "CAN", "HRV", "DEU", "IRL",
+                              "NLD", "NOR", "SVN", "UK", "USA")) + 
+  theme(plot.title = element_text(hjust = 0.53)) 
+   
+```
+
+# Chapter 4\
+
+Before we begin, let's load `tidyverse`, `dplyr`, and `scales`.
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(scales)
+```
+
+### Question 1 
+
+First, let's import a raw data file from a Git Hub link.
+
+```{r}
+nfl_salaries <- read.csv(
+  paste0(
+    "https://raw.githubusercontent.com/",
+    "NicolasRestrep/223_course/main/Data/",
+    "nfl_salaries.csv"
+  )
+)
+glimpse(nfl_salaries)
+```
+
+### Question 2 
+
+Now let's tidy up the data and combine the different columns/positions into one column called `positions` and add their values into a separate column called `salaries`.
+
+```{r}
+nfl_salaries_tidy <- nfl_salaries %>%
+  pivot_longer(names_to = "position",
+               values_to = "salaries",
+               cols = -year)
+glimpse(nfl_salaries_tidy)
+```
+
+### Question 3 
+
+Let's make histograms for each year for quarterbacks.
+
+```{r fig.align="center"}
+# Let's filter out quarter backs first and convert salaries to "in thousands"
+qb_only <- nfl_salaries_tidy %>%
+  filter(position == "Quarterback")
+
+qb_only  <- qb_only %>%
+  mutate(sal_in_millions = qb_only$salaries / 1000000)
+
+
+#First lets convert our salaries to "in thousands"
+
+# Now let's create our histogram
+ggplot(qb_only, aes(x = sal_in_millions)) +
+  geom_histogram() +  facet_wrap(~ year) + labs(
+    x = "Salaries (in millions)",
+    y = "Number of Players",
+    title = paste0("Number of",
+                   " Players who",
+                   " Recieved each",
+                   " Salary by Year")
+  ) +
+  scale_x_continuous(labels = dollar) +
+  theme(plot.title = element_text(hjust = 0.53)) 
+```
+
+**What patterns do you notice?** I notice that the the distribution is positively (right) skewed meaning that while a majority of quarterbacks make under 10 million, there are some who make well above this. This pattern of skewed-ness is consistent across every year.
+
+### Question 4 
+
+Now, let's create a new dataset that contains the average salary for each position each year.
+
+```{r}
+avg_pos_sal <- nfl_salaries_tidy %>%
+  group_by(position, year) %>%
+  summarize(avg_salaries = mean(salaries, na.rm = TRUE))
+
+glimpse(avg_pos_sal)
+```
+
+### Question 5 
+
+Lastly, let's make a linegraph that traces the evolution of each position's average salary across the years.
+
+```{r fig.align="center"}
+ggplot(avg_pos_sal, aes(x = year, y = avg_salaries,
+                        col = position)) +
+  geom_line() +
+  scale_y_continuous(name = "Average Salaries", labels = dollar) +
+  labs(x = "Year", title = "Average Salaries for each NFL Position by Year",
+       color = "NFL Player Position") +
+  scale_color_discrete( 
+    breaks = c("Offensive.Lineman",
+      "Defensive.Lineman",
+      "Quarterback",
+      "Wide.Receiver",
+      "Linebacker",
+      "Cornerback",
+      "Safety",
+      "Tight.End",
+      "Running.Back",
+      "Special.Teamer"),
+    labels = c(
+      "Offensive Lineman",
+      "Defensive Lineman",
+      "Quarterback",
+      "Wide Receiver",
+      "Linebacker",
+      "Cornerback",
+      "Safety",
+
+      "Tight End",
+      "Running Back",
+      "Special Teamer"))
+
+```
+
+**Describe at least two trends that are apparent to you.**\
+1. Linemen positions have consistently made the most each year.\
+2. Overtime, all positions have had a salary increase, however, some (Safety, Running Back, Tight End, Special Teamer) have had smaller increases than others (Offensive Lineman, Defensive Lineman, Quarterback, Wide Reciever, Linebacker, Cornerback).

@@ -1,0 +1,638 @@
+---
+title: "Chapter 3, 4, & 5 - DV"
+author: "Allyson Cameron"
+date: "2022-09-13"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Chapter 3
+
+```{r}
+library(tidyverse)
+
+# Read in the data
+exercise_data <- read_csv("Data/visualize_data.csv")
+
+# Glimpse the data
+glimpse(exercise_data)
+```
+
+### Question 1
+
+Before, we examine anything from the data, write down what you expect the relationship would look like. **Do you think people who record more exercise will have more or less BMI?** I think people who exercise more will have a lower BMI.
+
+```{r}
+
+# see correlation
+cor(exercise_data$Exercise, exercise_data$BMI)
+```
+
+So far, it looks like my prediction is correct. We see a moderate, negative correlation. This means that as one increases their exercise their BMI should decrease, or as one decreases their exercise one's BMI should increase.
+
+Let's plot the relationship to see it visually.
+
+```{r}
+# create base of ggplot
+a <- ggplot(exercise_data, aes(x = Exercise, y  = BMI))
+
+# add type of ggplot (scatter)
+a + geom_point()
+```
+
+I see a dinosaur! So the data is *definitely* not a negative correlation.
+
+### Question 2
+
+First, let's install the `causact` package.
+
+```{r eval = FALSE}
+# Let's install the needed package
+install.packages("causact")
+```
+
+Next, let's load the package and glimpse the dataset.
+
+```{r}
+library(causact)
+
+# Glimpse the data
+glimpse(corruptDF)
+
+# Let's see what each variable captures
+?corruptDF
+```
+
+1. What does `CPI2017` capture? It is showing the percieved level of corruption within the public sector based on a scale from 0 (very corrupt) to 100 (not corrupt at all).\
+
+2. What does `HDI2017` capture? It is showing a countries level of human development based on how well they achieve certain dimensions (nation longevity, education and income) associated with (human) development.\
+
+### Question 3
+
+Now, let's make a scatterplot to see the relationship between these variables.
+
+```{r}
+# Let's make a scatterplot, base first
+b <- ggplot(corruptDF, aes(x = CPI2017, y = HDI2017)) 
+
+# add geompoint() to base
+b + geom_point() + labs(x = "Corruption Perception Index (CPI)",
+                        y = "Human Development Index (HDI)",
+                        title = "Relationship between CPI and HDI")
+```
+
+There is a positive relationship relationship between `CPI2017` and `HDI2017` this means that the more corrupt a country is perceived the less likely they are to achieve at dimensions of human development.
+
+### Question 4
+
+Now, lets add a layer that captures the overall relationship between these two variables.
+
+```{r}
+# lets use lm method
+b + geom_point() + geom_smooth(method = "lm") + 
+  labs(x = "Corruption Perception Index (CPI)", 
+       y = "Human Development Index (HDI)", 
+       title = "Relationship between CPI and HDI")
+
+# lets use gam method
+b + geom_point() + geom_smooth(method = "gam") + 
+  labs(x = "Corruption Perception Index (CPI)", 
+       y = "Human Development Index (HDI)",
+       title = "Relationship between CPI and HDI")
+```
+
+I prefer the `gam` method because although the standard error is larger for the line the standard error still seems to encompass the points present while the `lm` method seems to not align as well towards the top right of the line/graph.
+
+### Question 5
+
+```{r}
+
+# create region base of ggplot
+b_by_region <- ggplot(corruptDF, aes(x = CPI2017, y = HDI2017, 
+                                     color = region, fill = region)) 
+
+# add geom_point and other details
+b_by_region  + geom_point() + geom_smooth(method = "gam", se = FALSE) + 
+  labs(x = "Corruption Perception Index (CPI)", 
+       y = "Human Development Index (HDI)", 
+        title = "Relationship between CPI and HDI, by region")
+```
+
+1.  **What do you see?**\
+I see that Sub-Saharan Africa has some of the most perceived corrupt countries along with the lowest achievement levels on the dimensions of human development. Additionally, EU W. Europe has some of the least perceived corruption and the highest achievement levels on the dimensions of human development.
+
+2.  **Are patterns clear or is the graph too cluttered? What would be another way to get these trends by region but in a way to would be more legible?**\
+
+While I can kind of read the graph, it is way too cluttered (I even tried taking off the standard errors to make it more legible!). Below I will show you another way to see these trends that is more legible.
+
+```{r}
+
+# create  new ggplot using base
+# adding facet wrap for region and group by country
+b_region_facet <- b_by_region  + geom_point(aes(group = country)) +
+  geom_smooth(method = "gam") + 
+  facet_wrap(~region) + 
+  guides(fill = FALSE, color = FALSE) + 
+  labs(x = "Corruption Perception Index (CPI)", 
+       y = "Human Development Index (HDI)",
+       title = "Relationship between CPI and HDI, by region")
+
+b_region_facet
+
+```
+
+Now we can see the trends for each region separately instead of having them all overlapping.
+
+### Question 6
+
+Now, lets reverse `CPI2017` so that the lower side of the graph shows low levels of corruption (100) instead of higher levels of corruption (0)
+
+```{r}
+#reverse the x scale
+facet_reverse <- b_region_facet + scale_x_reverse()
+
+facet_reverse 
+```
+
+### Question 7
+
+Let's add a title and subtitle to the plot along with a caption.
+
+```{r}
+# where is the data from
+?corruptDF
+
+# create output with titles and caption
+output <- facet_reverse + 
+  labs(title = "Corruption and Human Development by Region",
+                 subtitle = "Data points are countries with each region", 
+                 caption = "Source: Transparency International" )
+
+output
+```
+
+### Question 8
+
+Now lets save it for my *wonderful* supervisor.
+
+```{r}
+# Save the data
+ggsave(filename = "Chapter 3 Figure.pdf", plot = output)
+```
+
+
+# Chapter 4\
+
+### Question 1\
+Lets load `tidyverse` and read the data.
+
+```{r}
+library(tidyverse)
+
+# Read in the data
+tv_ratings <- read_csv("Data/tv_ratings.csv")
+
+# Glimpse the data
+glimpse(tv_ratings)
+
+```
+
+Next let's find out how many shows have 5 seasons or more. 
+```{r}
+# create var with total number of seasons
+tv_long <- tv_ratings %>% 
+  group_by(title) %>%
+  summarize(num_seasons = n()) %>%
+  ungroup() %>%
+  left_join(tv_ratings, by = "title")
+
+# filter for >5 seasons
+tv_long <- tv_long %>%
+  filter(num_seasons >= 5)
+
+# create dataframe with only 1 entry per show
+number_by_title <- tv_long %>%
+  group_by(title) %>%
+  slice(1) %>%
+  select(title, num_seasons) %>%
+  arrange(desc(num_seasons))
+  
+```
+Now, using `tv_long` lets create a line plot across seasons for average ratings. 
+
+```{r}
+# here is the base of the plot
+rate_season <- ggplot(tv_long, aes(x = seasonNumber, y = av_rating))
+
+# here is the complete plot
+rate_season_complete <- rate_season + geom_line(aes(group = title)) + 
+  labs(x = "Season Number", y = "Average Rating",
+       title = "Average Rating of Shows Across Seasons") + theme_bw()
+
+rate_season_complete
+```
+
+This plot is extremely messy. From it though, I gather than not many shows make it past about 12 seasons. Additionally, most shows start out with a rating of at least 7 out of 10. 
+
+### Question 2\
+Now, lets make it easier to read by facet wrapping. 
+```{r fig.height=10, fig.width=12}
+rate_season_complete + facet_wrap(~genres, ncol = 6) +
+  labs(title = "Average Rating of Shows Across Seasons, by Genre")
+```
+
+**What shows tend to last longer? Do ratings change much across seasons?**  Shows in the `Crime, Drama, Mystery` genre tend to last longer. In most cases, shows seem to have small rates of change in their ratings across seasons, but there is definitely a change. There are a few exceptions like `Drama, Family, Fantasy` or `Drama, Sport. `
+
+**Can you identify that show on Drama, Family, Fantasy whose ratings just plummeted?**
+```{r}
+
+# tidy helps you see every step in the process, gives you back a tibble
+plummeted <- tv_long %>%
+  filter(genres == "Drama,Family,Fantasy") %>%
+  select(title)
+
+plummeted
+
+```
+
+The show is "Are You Afraid of the Dark?" 
+
+### Question 3\
+```{r}
+high_rating <- tv_ratings %>%
+  filter(av_rating >= 9) %>%
+  mutate(Genres = genres) %>%
+  select(Genres,av_rating) 
+
+
+# create barplot
+high_rating_box <- ggplot(high_rating, aes(x = Genres))
+
+high_rating_box + geom_bar() + coord_flip() + 
+  labs(y = "Number of Top-Rated Shows", 
+       title = "Number of Top-Rated Shows Across Genres")
+```
+
+`coord_flip` changes the x and y axes to the opposite coordinate positions. 
+Drama has the most top-rated shows.
+
+### Question 4\
+```{r}
+# lets create an object with all genre categories with comedgy in it as comedy 
+# or with all dramas under drama
+comedies_dramas <- tv_ratings %>% 
+  mutate(is_comedy = if_else(str_detect(genres, "Comedy"), 
+                             1, 
+                             0)) %>% 
+                            # If it contains the word comedy then 1, else 0
+  filter(is_comedy == 1 | genres == "Drama") %>% # Keep comedies and dramas
+  mutate(Genres = if_else(genres == "Drama", 
+                          # Make it so that we only have those two genres
+                          "Drama", 
+                          "Comedy"))
+
+glimpse(comedies_dramas)
+```
+
+Now, let's make a density plot (exciting).
+
+```{r}
+cd_plot <- ggplot(comedies_dramas, aes(x = av_rating, fill = Genres, 
+                                       color = Genres))
+cd_plot + geom_density(alpha = 0.3) + 
+  labs(x = "Average Rating", y = "Density", 
+       title = "Average Ratings of Comedies and Dramas")
+```
+
+**How does my prediction above hold? Are dramas rated higher?**\
+I believe that this is showing that there are actually a lot of comedies that are still highly rated, they are just more often rated an 8, which was past our cutoff. 
+
+### Question 5\
+Let's try some other ways of visualizing this data
+```{r}
+# let's try a histogram
+cd_hist <- ggplot(comedies_dramas, aes(x = av_rating, fill = Genres))
+cd_hist + geom_histogram(color = "black", alpha = 0.45) + 
+  labs(x = "Average Rating", y = "Number of Top-Rated Shows", 
+       title = "Average Ratings of Comedies and Dramas")
+
+```
+
+With the histogram, we can reach the same conclusion on the number of comedies still being higher. However, now we are also able to see a count of how many shows are at what rating.
+```{r}
+# let's try a frequency poly
+cd_freqpoly <- ggplot(comedies_dramas, aes(x = av_rating, 
+                                          color = Genres))
+cd_freqpoly + geom_freqpoly() + 
+    labs(x = "Average Rating", y = "Number of Top-Rated Shows", 
+         title = "Average Ratings of Comedies and Dramas")
+```
+
+With the frequency polygon, we can now see the count along with the same graph structure as the density plot. \
+\
+I believe the frequency polygon is the most informative because it allows for a structure that is easier to read while also giving us the count which is easiest to conceptualize over density. 
+
+### Question 6\
+Now lets explore whether the actual quality of the show corresponded to viewership. 
+```{r}
+rating_viewship_plot <- ggplot(comedies_dramas, aes(x = av_rating, y = share))
+
+rating_viewship_plot + geom_bin_2d() + 
+  labs (x = "Average Rating", y = "Share (Viewership)",
+        title = "Relationship Between Average Ratings and Viewship")
+```
+
+Now we know that there were many shows with low viewership with pretty high ratings. 
+This graph gives us additional information of the relative count of shows with each respective average rating *and* their viewership (in other words, we can see the counts of two variables). \
+
+Now, let's see how this looks with genre in the fill aesthetic. 
+
+```{r}
+rvg_plot <- ggplot(comedies_dramas, aes(x = av_rating, y = share, 
+                                        fill = Genres)) 
+
+rvg_plot + geom_bin_2d() + 
+  labs(x = "Average Rating",y = "Share (Viewership)", 
+       title = "Relationship between Viewship and Average Ratings",
+       subtitle = "For Comedies and Dramas")
+                      
+
+```
+
+**What pattern do you see?**\
+
+I see that comedies seem to have more viewership than dramas, especially the higher the rating (except for the one outlier which is a drama). 
+
+Lastly, let's find out the title of this outlier. 
+
+```{r}
+# I'm going to utilize the graph 
+# since I know that all other viewership numbers were less than 20
+# lets just filter for the share that is greater than 20. 
+
+comedies_dramas %>%
+  filter(share > 20)
+```
+
+The show is called Dekalog. \
+
+
+# Chapter 5\
+
+First, let's begin by reading the data and loading `tidyverse`.
+
+```{r}
+library(tidyverse)
+# Read in the data 
+wncaa <- read_csv("Data/wncaa.csv")
+
+# Glimpse the data 
+glimpse(wncaa)
+```
+### Question 1\
+
+```{r}
+# create percentages of tournaments one by school
+champ_by_school <- wncaa %>%
+  filter(tourney_finish == "Champ") %>%
+  group_by(school) %>%
+  summarize(N = n()) %>%
+  mutate(freq = N/sum(N), pct = round((freq*100),0)) %>%
+  arrange(desc(pct))
+
+
+# now let's make a bar plot
+cs <- ggplot(champ_by_school, aes(x = reorder(school, pct), y = pct))
+cs + geom_col() + coord_flip() +
+  labs(x = "School", y = "Percentage of Tournaments Won",
+       title = "Percentage of Tournaments won by each school")
+              
+```
+
+The *first* thing I notice is that most of the Texas schools won small amounts of the tournaments they were in (~2.5% - lame).  I also wonder why most teams seem to fall into either 5% or ~2.5% of wins, why is there so low variation?
+
+Tennessee and UCon have won the most. 
+
+### Question 2\
+
+First, lets create a dataset that includes just the top teams
+```{r}
+# Get the names of each of the schools through using the champ dataset
+champ_names <- unique(champ_by_school$school)
+
+champ_names
+
+# now lets use the champ names to get the school champs from the orig. data set
+
+# we're going to group by school for the next step
+winners <- wncaa %>%
+  filter(school %in% champ_names) %>%
+  mutate(seed2 = as.factor(seed)) #create character value of seed for fill
+
+# I noticed later on we are called to use as.factor, 
+# let's see what this is about. 
+?as.factor
+ 
+
+winners
+```
+
+Next, lets make a plot that shows the distribution of `seeds` for each school. 
+```{r }
+w <- ggplot(winners, aes(x = reorder(school,seed), y = seed))
+w + geom_boxplot() + coord_flip() +
+  labs( x = "School", 
+       y = "Seed", title = "Number of Teams each school has in each Seed")
+```
+
+Tennessee and UConn, the schools with the highest tournament wins, have the most seed one teams.\
+**Any surprises?** I am surprised that Maryland seems to have so many high seed teams (closer to 1) but still is one of the lowest teams for percent of tournaments won. 
+
+Now lets make the same plot using `geom_violin`.
+
+```{r}
+w2 <- ggplot(winners, aes(x = reorder(school,seed), y = seed))
+w2 + geom_violin() + coord_flip() + 
+  labs(title = "Number of Teams each school has in each Seed", x = "School",
+       y = "Seed")
+```
+
+I find this graph way easier to read, because I can tell where each school has large amounts of seed one, two, etc. teams. However, I think the other graph gives you more precise information on the amount of teams each school has within each seed. 
+
+
+### Question 3\
+
+Now, let's try visualizing the data with a scatterplot. 
+
+```{r}
+w2 + geom_point() + coord_flip() + 
+  labs(x = "School", y = "Seed",
+       title = "Number of Teams each school has in each Seed")
+```
+
+As you can see, this doesn't work very well because the values available for "seed" are discrete and thus the options for each team are stacked on top of each other.  The most we can tell from this is something like "Old Dominion and Notre Dame don't have any  seed 3 teams." We can't see how many teams are within each seed for each school . 
+
+### Question 4\
+Now, lets try the `summarize_if` verb. We're going to use the  `winners` dataset.
+```{r}
+# lets summarize values if they are numeric 
+# and take out NA values for each school 
+
+school_m_sd <- winners %>%
+  group_by(school) %>%
+  mutate(year = as.factor(year)) %>%
+  summarize_if(is.numeric, funs(mean, sd), na.rm = TRUE) %>%
+  select(school, reg_percent_mean, reg_percent_sd)
+
+# lets explore average win percentages and standard deviations. 
+school_m_sd
+
+```
+
+Perfect, now let's make a dot plot. 
+```{r}
+win_percent_plot <- ggplot(school_m_sd, aes(x = reorder(school, 
+                                                        reg_percent_mean), 
+                                            y = reg_percent_mean))
+win_percent_plot + geom_point() + coord_flip() + 
+  labs(x = "School", y = "Average Regular Season % of Wins",
+       title = "Regular Season Performance of Each School")
+```
+
+UConn and Lousiana Tech have the highest percent of regular season wins. Southern California and Texas A&M have the lowest percent of regular season wins. All teams had over 60% of wins in their regular season.
+
+```{r}
+win_percent_plot + 
+  geom_pointrange(aes(ymin = reg_percent_mean - reg_percent_sd,
+                      ymax = reg_percent_mean + reg_percent_sd)) +
+   coord_flip() + labs(x = "School", y = "Average Regular Season % of Wins", 
+                       title = "Regular Season Performance of Each School")
+
+```
+ 
+ **What school has the most narrow interval**
+ Texas A&M has the most narrow interval. 
+
+Now, let's try to make a plot using `geom_linerage`. 
+```{r}
+win_percent_plot2 <- ggplot(school_m_sd, 
+                            aes(x = reorder(school, reg_percent_mean), y =
+                                  reg_percent_mean)) + geom_point()
+
+win_percent_plot2 +
+  geom_linerange(aes(ymin = reg_percent_mean - reg_percent_sd,
+                      ymax = reg_percent_mean + reg_percent_sd)) +
+   coord_flip() + labs(x = "School", y = "Average Regular Season % of Wins", 
+                       title = "Regular Season Performance of Each School")
+```
+
+**Can you produce the same graph?**\
+Yes! You just combine `geom_point` and `geom_linerange`. 
+
+### Question 5
+
+Now lets explore how regular season performance is related to full performance. 
+
+```{r}
+ggplot(winners, aes(x = reg_percent, y = full_percent)) + geom_point() + geom_abline() + 
+labs(x = "Regular Season % of Wins", y = "After tournament % of Wins", 
+     title = " Full Performance and Regular Season Performance of Schools")
+```
+
+Most teams did not improve after the tournament compared to their regular season performance. However, quiet a few did.\
+
+Additionally, the amount of teams who improved increases as we go up in their regular season performance. For example, there are fewer teams who improved in full performance whose regular season performance is 60% while there are more teams who's full performance improved from their 90% regular season performance. 
+
+### Question 6
+```{r}
+# create a variable for champs 
+winners <- winners %>% 
+  mutate(is_champ = if_else(tourney_finish == "Champ", 1, 0), 
+         is_champ = as.factor(is_champ))
+  
+
+dubs <- ggplot(winners, aes(x = reg_percent, y = full_percent, 
+                            color = is_champ))  
+dubs + geom_point() + geom_abline() + 
+  labs(x = "Regular Season % of Wins",
+       y = "After tournament % of Wins", 
+     title = " Full Performance and Regular Season Performance of Schools",
+     col = "Champion Status") +
+  scale_colour_discrete(labels = c("No", "Yes"))
+
+
+
+```
+
+```{r}
+# lets see what happens if we use is_champ without as.factor
+winners <- winners %>% 
+  mutate(is_champ2 = if_else(tourney_finish == "Champ", 1, 0))
+
+ggplot(winners, aes(x = reg_percent,y = full_percent, 
+                    color = is_champ2)) +
+  geom_point() + geom_abline() + 
+  labs(x = "Regular Season % of Wins", y = "After tournament % of Wins", 
+       title = " Full Performance and Regular Season Performance of Schools",
+       col = "Champion Status")
+```
+
+Without `as.factor` the variable produces a scale from the numeric values from 0 to 1 instead of as discrete values of 0 and 1. 
+
+**Do you see any patterns? Do they make sense to you?**\
+Right away, I see a pattern of champions  as being the ones who had improvement from their regular season performance to their full performance. This makes sense to me because these teams had improvement and thus were able to come out on top. 
+
+### Question 7\
+```{r}
+winners2 <- winners %>% 
+  mutate(plot_label = paste(school, year, sep = " - ")) %>%
+  mutate(difference = full_percent - reg_percent) 
+
+# now let's find these teams 
+winners2 %>%
+  filter(reg_percent < 50 | reg_percent < 71 & full_percent > 71)  
+
+```
+Now lets create the plot with labels. First we need to install `ggrepel` so that it makes labelling our graph easier. 
+```{r, eval = FALSE}
+#first we need to install the ggrepel package
+install.packages("ggrepel")
+```
+Next, let's laod the package and create our plot. 
+```{r}
+library(ggrepel)
+
+champ_plot <- ggplot(winners2, aes(x = reg_percent, 
+                                   y = full_percent)) + 
+  geom_point() + geom_abline()
+
+
+champ_plot + 
+  geom_text_repel(data = subset(winners2, reg_percent < 50 | 
+                                  reg_percent < 71 & full_percent > 71), 
+                  mapping = aes(label = plot_label), 
+                  hjust = -3.5, vjust = .4) + 
+  labs(x = "Regular Season % of Wins", y = "After tournament % of Wins", 
+     title = " Full Performance and Regular Season Performance of Schools")
+
+```
+I think its interesting that Tennessee, at this point, had such low regular season performance but was still able to somehow dominate in tournaments! It's also pretty interesting Notre Dame sucked (forgive me if you love them or something) but still managed to be in the higher numbers for tournament wins over all. I guess they got their act together. :) 
+ 
+
+### Question 8
+Lastly, let's find what teams have gone unbeaten (meaning they have 100% performance in the regular and full seasons). 
+
+```{r}
+winners %>%
+  group_by(school) %>%
+  filter(full_percent == 100 & reg_percent == 100)
+```
+The teams that have gone unbeaten are: Texas (hook 'em), UConn, and Baylor. 
+
+**Any patterns? Surprises?**\
+I'm surprised Tennessee isn't listed when they have a high number of seed 1 teams and high percentage of wins. I think a pattern I notice though is that UConn has a high number of years where they went unbeaten which makes sense since they have a high number of seed 1 teams and won a large percentage of games.
