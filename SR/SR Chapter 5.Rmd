@@ -321,7 +321,7 @@ ggplot(postsum,
   geom_point(size = 2) +
   geom_linerange(size = 1) +
   geom_vline(xintercept = 0,
-             color = "gray") +
+             color = "gray") + theme( legend.position = "none") +
   xlim(-2,2) +
   labs(x = "Estimate",
        y = "") +   facet_wrap(~term, nrow = 3) 
@@ -358,7 +358,7 @@ p2
 ```
 
 **5M2. Invent your own example of a masked relationship. An outcome variable should be correlated with both predictor variables, but in opposite directions. And the two predictor variables should be correlated with one another.**\
-I am going to be doing the relationship between family size (S), family income (I), and child education attainment (E). First, let's start with showing this relationship with a DAG. I am not sure which way the relationship between family income and family size goes, but for this model I will posit that family income influences family size. Since I am not sure how to show signs in a DAG, I will write them here. S (-) E, I (+) E, S (-) I
+I am going to be doing the relationship between family size (S), family income (I), and child education attainment (E). First, let's start with showing this relationship with a DAG. I am not sure which way the relationship between family income and family size goes, but for this model I will posit that family income influences family size. Since I am not sure how to show signs in a DAG, I will write them here. S (-) E, I (+) E, I (-) S.
 ```{r}
 # let's make a DAG first.
 
@@ -604,7 +604,7 @@ ggplot(postsum,
   geom_point(size = 2) +
   geom_linerange(size = 1) +
   geom_vline(xintercept = 0,
-             color = "gray") +
+             color = "gray") + theme( legend.position = "none") +
   xlim(-2,2) +
   labs(x = "Estimate",
        y = "") +   facet_wrap(~term, nrow = 3) 
