@@ -1,0 +1,431 @@
+---
+title: "Chapter 6 SR"
+author: "Allyson Cameron"
+date: "2022-10-11"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+First, let's load in packages we need before beginning.
+
+```{r}
+library(rethinking)
+library(tidybayes)
+library(tidybayes.rethinking)
+library(tidyverse)
+library(ggdag)
+```
+
+**6E1. List three mechanisms by which multiple regression can produce false inferences about causal effects.**\
+
+Three mechanisms are: multicollinearity, post-treatment bias, and
+collider bias.
+
+Multicollinearity means there is a very strong association between two or more independent/predictor variables. It is usually the result of a confounding parameter that is non-identifiable or two predictor produce similar and repetitive results. Either way, multicollinearity makes it hard to disentangle the isolated effects of each variable. Multicollinearity usually results in the posterior distribution suggesting that none of the variables are reliably associated with the outcome, even when they all may actually have a strong association with the it Further, it can weaken the precision of your predicted coefficients and make them harder to interpret.
+
+Post-treatment bias means is a type of included variable bias. It occurs when a variable that is a consequence of treatment is included as a control variable. In other words, this occurs when the variable being controlled is a part of the causal path (the mediating variable in a pipe), so controlling for it blocks the path. Whatever indirect causal effect of treatment here is on the mediating variable will be removed from the results and lead us to make a mistake in our inference (could make us think a treatment works when it doesn't or that it doesn't work when it does).
+
+Collider bias occurs when you condition on a collider variable. The two predictor variables are not associated, but once you stratify by the collider the two predictor variables create a false statistical association.
+
+**6E2. For one of the mechanisms in the previous problem, provide an example of your choice, perhaps from your own research.**\
+
+(I read the question wrong and ended up doing one for each, please let me know if these relationships make sense. Thank you. )
+
+**Multicollinearity**: Here, I will be studying the relationship between depression (D), anxiety (A), and substance use (S). Depression and anxiety are often co-occurring diagnoses and have a strong association (0.8).From this, it may make it hard to disentangle the isolated effects of each variable on the outcome variable S. Additionally, including both anxiety and depression in the model may suggest that non of the variables are associated even when they may actually have a strong association with each other.
+
+Here is my DAG (I used a double headed arrow to notate the strong
+association between anxiety and depression).
+
+```{r}
+
+dag_coords <-
+  tibble(
+    name = c("D", "A", "S"),
+    x = c(1, 3, 2),
+    y = c(2, 2, 1)
+  )
+
+p1 <-
+  dagify(S ~ A, S ~ D, D ~ A, A ~ D,
+    coords = dag_coords
+  ) %>%
+  ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_dag_point(color = "blue4", alpha = 1 / 4, size = 10) +
+  geom_dag_text(color = "cornflowerblue") +
+  geom_dag_edges(edge_color = "blue4") +
+  scale_x_continuous(NULL, breaks = NULL, expand = c(0.1, 0.1)) +
+  scale_y_continuous(NULL, breaks = NULL, expand = c(0.2, 0.2)) +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  labs(
+    title = "DAG for potential multicollineary",
+    subtitle = "between Depression (D), Anxiety (A) and Substance Use (S)")
+
+p1
+```
+
+**Post-treatment bias**: For this one, I will be looking at the
+relationship between membership in racial pride reinforcement
+intervention (I), parental awareness of the positive impacts of Black safe spaces on children (A), and children engaged in more Black safe spaces (B). The intervention will occur and parents awareness would be measured through a post-intervention survey and with follow up surveys asking about how often they encourage their child to participate in Black safe spaces.\
+
+The logic I am using is that having membership in the intervention will have a direct effect on being children engaging in Black safe spaces because participating in the intervention will require that both the parent and child engage in activities for the intervention that lead to direct engagement with Black safe spaces. However, the treatment effect of the intervention is that parents will have more awareness of the positive impacts of racial pride reinforcement through Black safe spacesn on their child hopefully leading to their intentional continuous engagement in Black safe spaces.\
+
+To complete a statistical analysis I would not control for parental awareness. Controlling for parental awareness would mask the causal influence of my intervention/treatment.\
+
+Below I have produced a DAG.
+
+```{r}
+
+dag_coords2 <-
+  tibble(
+    name = c("I", "A", "B"),
+    x = c(1, 3, 2),
+    y = c(2, 2, 1)
+  )
+
+p2 <-
+  dagify(B ~ I, A ~ I, B ~ A,
+    coords = dag_coords2
+  ) %>%
+  ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_dag_point(color = "blue4", alpha = 1 / 4, size = 10) +
+  geom_dag_text(color = "cornflowerblue") +
+  geom_dag_edges(edge_color = "blue4") +
+  scale_x_continuous(NULL, breaks = NULL, expand = c(0.1, 0.1)) +
+  scale_y_continuous(NULL, breaks = NULL, expand = c(0.2, 0.2)) +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  labs(
+    title = "DAG for potential post treatment bias",
+    subtitle = "between Intervention Membership (I), Parental Awareness (A)
+    and Child's Engagement with Black Safe-Spaces (B)"
+    )
+
+p2
+```
+
+**Collider bias**: Here I will be exploring the relationship between
+proximity to whiteness, age, and self-esteem. I believe that proximity
+to whiteness (race) and age are two independent variables with no
+association. However, both race and age can impact your self-esteem.
+
+I predict that distance from whiteness has a negative relationship with
+self-esteem and that age and self-esteem have a positive relationship.
+
+In the case of this, if we controlled for self-esteem it would look as
+though proximity to whiteness changes with age. However, we know this is
+not possible. When you get older you do not get closer to whiteness.
+When you get younger you are not farther from whiteness. This would be
+illogical.
+
+```{r}
+dag_coords3 <-
+  tibble(
+    name = c("W", "A", "S"),
+    x = c(1, 3, 2),
+    y = c(2, 2, 1)
+  )
+
+p3 <-
+  dagify(S ~ W, S ~ A,
+    coords = dag_coords3
+  ) %>%
+  ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_dag_point(color = "blue4", alpha = 1 / 4, size = 10) +
+  geom_dag_text(color = "cornflowerblue") +
+  geom_dag_edges(edge_color = "blue4") +
+  scale_x_continuous(NULL, breaks = NULL, expand = c(0.1, 0.1)) +
+  scale_y_continuous(NULL, breaks = NULL, expand = c(0.2, 0.2)) +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  labs(
+    title = "DAG for potential collider bias",
+    subtitle = "between Proximity to Whiteness (W), Age (A) and Self-Esteem (S)"
+    )
+
+p3
+```
+
+**6E3. List the four elemental confounds. Can you explain the conditional dependencies of each?**\
+
+1)  Pipe (mediator): $$X \rightarrow Z \rightarrow Y$$
+
+```{r}
+dagitty('dag{X -> Z -> Y}') %>% 
+  impliedConditionalIndependencies()
+```
+
+X should be independent of Y when we condition on Z. X and Y are
+associated byt there is no common cause, Z passes on something about X
+to Y. Once stratified by Z, there is no association between X and Y.\
+
+2)  Collider: $$ X \rightarrow Z \leftarrow Y$$
+
+```{r}
+dagitty('dag{X -> Z <- Y}') %>% 
+  impliedConditionalIndependencies()
+```
+
+X is independent of Y when we do not condition on anything. They have no
+association and share no causes. If we condition on Z there will be an
+association.\
+
+3)  Fork (confounder): $$ X \leftarrow Z \rightarrow Y$$
+
+```{r}
+dagitty('dag{X <- Z -> Y}') %>% 
+  impliedConditionalIndependencies()
+```
+
+X and Y are associated and share a common cause, Z. Once we stratified by Z, there is no association between X and Y. "X and Y are independent conditional on Z".\
+
+4)  Descendant:\
+
+$$
+\begin{align}
+X \rightarrow \  &Z \ \leftarrow Y\\
+&\downarrow \\ 
+&D
+\end{align}
+$$
+
+```{r}
+dagitty('dag{
+        X -> Z -> Y
+        Z ->  D}') %>% 
+  impliedConditionalIndependencies()
+```
+
+D is independent of X conditional on Z. D is also independent of Y conditional on Z. X and Y are independent conditional on Z. Conditioning on D will partially condition on Z (leading to similar effects I just mentioned). This means that conditioning on D will partially open the path from X to Y because we have a collider variable that will have been somewhat conditioned.\
+
+**6E4. How is a biased sample like conditioning on a collider? Think of the example at the open of the chapter.**\
+
+Conditioning on a collider creates sub-samples that create biased information. For example, the newsworthiness and the trustworthiness in the book both influence selection. However, when you condition on selection it created a negative relationship between newsworthiness and trustworthiness even though they have no relationship.\
+
+With a biased sample, the sample is similar to what would happen with a collider bias. For example, if you had sampled only those selected for the journals then you would be, in a way, systematically stratifying by a variable that is impacted by both newsworthiness and trustworthiness. That would give you a similar result to controlling for selection when it is an actual collider in the sample. The sample becomes homogeneous on key feature to the relationship being studied, thus making it biased and impacting the relationship between the variables actually analyzed in the analysis.\
+
+**6M1. Modify the DAG on page 186 to include the variable V, an unobserved cause of C and Y: C ← V → Y. Reanalyze the DAG. How many paths connect X to Y? Which must be closed? Which variables should you condition on now?**\
+
+```{r}
+dag_coords4 <-
+  tibble(
+    name = c("A", "U", "C", "B", "X", "Y", "V"),
+    x = c(2, 1, 3, 2, 1, 3, 4),
+    y = c(4, 3, 3, 2, 1, 1, 3)
+  )
+
+p4 <-
+  dagify(
+    U ~ A, C ~ A, B ~ U, B ~ C, X ~ U, Y ~ C, Y ~ X, C ~ V, Y ~ V,
+    coords = dag_coords4
+  ) %>%
+ ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_dag_point(aes(color = name == "U" | name == "V"),
+                 alpha = 1/2, size = 6.5, show.legend = F) +
+  geom_point(x = 1, y = 3, 
+             size = 6.5, shape = 1, stroke = 1, color = "gray52") +
+    geom_point(x = 4, y = 3, 
+             size = 6.5, shape = 1, stroke = 1, color = "gray52") +
+  geom_dag_text(color = "black") +
+  geom_dag_edges() +
+  scale_color_manual(values = c("steelblue", "gray84")) +
+  scale_x_continuous(NULL, breaks = NULL, expand = c(.1, .1)) +
+  scale_y_continuous(NULL, breaks = NULL, expand = c(.1, .1)) +
+  labs(
+    title = "DAG with new unobserved cause V", 
+    caption = "U and V are unobserved variables")
+
+p4
+```
+
+Without V, we had 3 paths.\
+
+One front door path (we do not need to consider this path when choosing what to condition on): 
+
+(1) $$ X \rightarrow Y$$\
+
+Two backdoor paths: (2)
+$$X \leftarrow U \leftarrow A \rightarrow C \rightarrow Y$$\
+
+This path is not closed, information can flow through it and reach from X to Y. A and C are confounders that we could potentially condition on.\
+
+(3) $$X \leftarrow U \rightarrow B \leftarrow C \rightarrow Y$$\
+
+This path is closed, B is a collider. We do not need to condition on anything in the path.\
+
+We have two additional backdoor paths now from X.\
+(4)
+$$X \leftarrow U \leftarrow A \rightarrow C \leftarrow V \rightarrow Y$$\
+This path is closed, C is now a collider variable. So, if we condition on C this would open this backdoor path.\
+(5)$$X \leftarrow U \rightarrow B \leftarrow C \leftarrow V \rightarrow Y$$\
+B is again the collider and this path is closed.\
+
+After assessing my options, 2 is the only open backdoor path, and we should condition on A.\
+
+**6M2. Sometimes, in order to avoid multicollinearity, people inspect pairwise correlations among predictors before including them in a model. This is a bad procedure, because what matters is the conditional association, not the association before the variables are included in the model. To highlight this, consider the DAG X → Z → Y. Simulate data from this DAG so that the correlation between X and Z is very large. Then include both in a model prediction Y. Do you observe any multicollinearity? Why or why not? What is different from the legs example in the chapter?**\
+
+```{r}
+
+# first let's create our tibble Z ~ X, Y ~ Z
+N <- 1000 
+d <- tibble(
+  X = rnorm(N, mean = 0, sd = 1),
+  Z = rnorm(N, mean = X, sd = 0.2), 
+  #using small SD, this should make the correlation large
+  Y = rnorm(N, mean = Z, sd = 1)) %>% 
+  mutate(across(c(X,Z,Y),
+                ~ (.x - mean(.x)) / sd(.x))) # standardizing to z scores
+
+# we standardize because it will allow me to set 
+# more easily interpretable priors below
+
+
+# lets check the correlation between X and Z
+d %>%
+  summarize(correlation = cor(X, Z))
+
+# create qudratic approxs, I want to compare across models with and without Z
+
+# Z only
+
+ZY_sim <- quap(
+  alist(
+    Y ~ dnorm(mu, sigma),
+    mu <- a + bZ*Z,
+    a ~ dnorm(0, 0.2),
+    bZ ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ),
+  data = d
+)
+precis(ZY_sim)
+
+# X only
+
+XY_sim <- quap(
+  alist(
+    Y ~ dnorm(mu, sigma),
+    mu <- a + bX * X,
+    a ~ dnorm(0, 0.2),
+    bX ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ),
+  data = d
+)
+precis(XY_sim)
+
+# X Z Y
+
+XZY_sim <- quap(
+  alist(
+    Y ~ dnorm(mu, sigma),
+    mu <- a + bX * X + bZ*Z,
+    a ~ dnorm(0, 0.2),
+    bX ~ dnorm(0, 0.5),
+    bZ ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ),
+  data = d
+)
+precis(XZY_sim)
+
+# prep for plot
+
+# samples
+XZY_post <- tidy_draws(XZY_sim, n = 1e4) %>%  
+  select(bZ, bX)
+ZY_post <- tidy_draws(ZY_sim, n = 1e4) %>%  
+  select(bZ)
+XY_post <- tidy_draws(XY_sim, n = 1e4) %>%  
+  select(bX)
+
+# orient values
+
+XZY_longpost <- XZY_post %>% 
+  pivot_longer(everything(),
+               names_to = "term",
+               values_to = "values")
+
+ZY_longpost <- ZY_post %>% 
+  pivot_longer(everything(),
+               names_to = "term",
+               values_to = "values")
+XY_longpost <- XY_post %>% 
+  pivot_longer(everything(),
+               names_to = "term",
+               values_to = "values")
+
+# add upper/lower bounds for plot
+
+XZY_postsum <- XZY_longpost |>
+  group_by(term) |> 
+  summarize(mean = mean(values),
+            lb = quantile(values, .055),
+            ub = quantile(values, .945)) %>%
+  mutate(model = "XZY")
+
+ZY_postsum <- ZY_longpost |>
+  group_by(term) |> 
+  summarize(mean = mean(values),
+            lb = quantile(values, .055),
+            ub = quantile(values, .945)) %>%
+  mutate(model = "ZY")
+
+XY_postsum <- XY_longpost |>
+  group_by(term) |> 
+  summarize(mean = mean(values),
+            lb = quantile(values, .055),
+            ub = quantile(values, .945)) %>%
+  mutate(model = "XY")
+
+# combining into one tibble
+postsum <- full_join(ZY_postsum, XY_postsum, by = c("model", "lb", "ub", "mean", "term")) 
+postsum <- full_join(postsum, XZY_postsum, by = c("model", "lb", "ub", "mean", "term")) 
+
+# time to plot
+
+ggplot(postsum,
+       aes(mean, model, color = model,
+           xmin = lb,
+           xmax = ub)) +
+  geom_point(size = 2) +
+  geom_linerange(size = 1) +
+  geom_vline(xintercept = 0,
+             color = "gray") + theme( legend.position = "none") +
+  xlim(-2,2) +
+  labs(x = "Estimate",
+       y = "") +   facet_wrap(~term, nrow = 2)  +
+  labs(title = "Coefficient Plot of Relationships",
+       subtitle = "between Z and Y; X, Z and Y; and X and Y")
+
+```
+
+bZ and bX have essentially the same strength of association when alone. However, when are both included in the model, the standard deviations grow considerably. Additionally, we see that bX becomes hidden by bZ. bX is very close to zero and bZ takes on a value very close to the one both bZ and bX both originally had when isolated. I believe this would not be evidence of multicollinearity because Z is getting information through X instead of just being highly correlated with X, and then both X and Z giving separate, very similar, information to Y. In this case, Z is a mediating variable so it is different than the leg example, Z gets its information from X.\
+
+**6M3. Learning to analyze DAGs requires practice. For each of the four DAGs below, state which variables, if any, you must adjust for (condition on) to estimate the total causal influence of X on Y.**\
+![Figure 1](/Users/allysoncameron/Desktop/soc_722_stats/Screen%20Shot%202022-10-12%20at%2012.19.59%20AM.png)
+
+I am going to describe the answer for each DAG moving clockwise and labeling them 1, 2, 3, and 4.\
+
+For 1 (top left), I would condition on Z. This will close the backdoor to X from both paths.\
+$$X \leftarrow Z \leftarrow A \rightarrow Y$$\
+$$X \leftarrow Z \rightarrow Y$$\
+
+For 2 (top right), is a closed backdoor path because Z is a collider variable.So we do not need to condition on anything.\
+$$X \rightarrow Z \rightarrow Y$$\
+$$X \rightarrow Z \leftarrow A \rightarrow Y$$\
+
+For 3 (bottom right), I would condition on A. This will close the one backdoor path. Z is a mediating variable .
+$$X \leftarrow A \rightarrow Z \rightarrow Y$$
+
+For 4 (bottom left), the backdoor path from X is closed, Z is a
+collider. So we do not need to condition on anything.\
+$$X \leftarrow A \rightarrow Z \leftarrow Y$$
