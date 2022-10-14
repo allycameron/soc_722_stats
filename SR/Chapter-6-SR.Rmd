@@ -3,8 +3,8 @@ title: "Chapter 6 SR"
 author: "Allyson Cameron"
 date: "2022-10-11"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 editor_options:
   markdown:
     wrap: 72
@@ -112,19 +112,11 @@ p2 <-
 p2
 ```
 
-**Collider bias**: Here I will be exploring the relationship between
-proximity to whiteness, age, and self-esteem. I believe that proximity
-to whiteness (race) and age are two independent variables with no
-association. However, both race and age can impact your self-esteem.
+**Collider bias**: Here I will be exploring the relationship between proximity to whiteness, age, and self-esteem. I believe that proximity to whiteness (race) and age are two independent variables with no association. However, both race and age can impact your self-esteem.
 
-I predict that distance from whiteness has a negative relationship with
-self-esteem and that age and self-esteem have a positive relationship.
+I predict that distance from whiteness has a negative relationship with self-esteem and that age and self-esteem have a positive relationship.
 
-In the case of this, if we controlled for self-esteem it would look as
-though proximity to whiteness changes with age. However, we know this is
-not possible. When you get older you do not get closer to whiteness.
-When you get younger you are not farther from whiteness. This would be
-illogical.
+In the case of this, if we controlled for self-esteem it would look as though proximity to whiteness changes with age. However, we know this is not possible. When you get older you do not get closer to whiteness. When you get younger you are not farther from whiteness. This would be illogical.
 
 ```{r}
 dag_coords3 <-
@@ -163,9 +155,7 @@ dagitty('dag{X -> Z -> Y}') %>%
   impliedConditionalIndependencies()
 ```
 
-X should be independent of Y when we condition on Z. X and Y are
-associated byt there is no common cause, Z passes on something about X
-to Y. Once stratified by Z, there is no association between X and Y.\
+X should be independent of Y when we condition on Z. X and Y are associated byt there is no common cause, Z passes on something about X to Y. Once stratified by Z, there is no association between X and Y.\
 
 2)  Collider: $$ X \rightarrow Z \leftarrow Y$$
 
@@ -174,9 +164,7 @@ dagitty('dag{X -> Z <- Y}') %>%
   impliedConditionalIndependencies()
 ```
 
-X is independent of Y when we do not condition on anything. They have no
-association and share no causes. If we condition on Z there will be an
-association.\
+X is independent of Y when we do not condition on anything. They have no association and share no causes. If we condition on Z there will be an association.\
 
 3)  Fork (confounder): $$ X \leftarrow Z \rightarrow Y$$
 
@@ -408,7 +396,7 @@ ggplot(postsum,
 
 ```
 
-bZ and bX have essentially the same strength of association when alone. However, when are both included in the model, the standard deviations grow considerably. Additionally, we see that bX becomes hidden by bZ. bX is very close to zero and bZ takes on a value very close to the one both bZ and bX both originally had when isolated. I believe this would not be evidence of multicollinearity because Z is getting information through X instead of just being highly correlated with X, and then both X and Z giving separate, very similar, information to Y. In this case, Z is a mediating variable so it is different than the leg example, Z gets its information from X.\
+bZ and bX have essentially the same strength of association when alone. However, when are both included in the model, the standard deviations grow considerably. Additionally, we see that bX becomes hidden by bZ. bX is very close to zero and bZ takes on a value very close to the one both bZ and bX both originally had when isolated. I believe this would not be evidence of multicollinearity because while Z and X are highly correlated we still see some correlation for at least Z when all of the variables are in the model. This is different then the leg example where both values moved closer to zero when everything was included in the model. Additionally, Z is a mediating variable, meaning its dependent on X, and thus not  an independent variable with a strong correlation as is characterized in multicollinearity. It is correlated to X because its information comes from X. \
 
 **6M3. Learning to analyze DAGs requires practice. For each of the four DAGs below, state which variables, if any, you must adjust for (condition on) to estimate the total causal influence of X on Y.**\
 ![Figure 1](/Users/allysoncameron/Desktop/soc_722_stats/Screen%20Shot%202022-10-12%20at%2012.19.59%20AM.png)
