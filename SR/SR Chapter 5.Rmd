@@ -308,7 +308,7 @@ DP_postsum <- DP_longpost |>
   summarize(mean = mean(values),
             lb = quantile(values, .055),
             ub = quantile(values, .945)) %>%
-  mutate(model = "DAP")
+  mutate(model = "DP")
 
 # this is my way of adding all of the values I need together for my plot
 postsum <- full_join(DP_postsum, AP_postsum, by = c("model", "lb", "ub", "mean", "term")) 
@@ -751,7 +751,7 @@ m_longpost <- m_post %>%
                names_to = "term",
                values_to = "values")
 
-m_postsum <- m_longpost%>% 
+m_postsum <- m_longpost %>% 
   group_by(term) %>% 
   summarize(mean = mean(values), # taking means of the sampled parameters
             lb = quantile(values, .055),
