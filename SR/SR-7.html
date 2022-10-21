@@ -496,17 +496,18 @@ estimate of the relative out-of-sample KL divergence. AIC is only
 reliable when the priors are flat/overwhelmed by the likelihood, the
 posterior distribution is approximately (multivariate) normally
 distributed, and the sample size is (extremely) larger than the number
-of parameters. WAIC, on the other had also constructs a theoretical
-estimate of the relative out-of-sample KL divergence. However, this
-information criterion is much more general and does not assume the shape
-of the posterior (e.g. that it is a normal distribution like with AIC).
-WAIC works best with large samples because it allows it to compute the
-out-of-sample deviance that converges to the cross-validation
-approximation. Because WAIC is point-wise and predictions are considered
-case by case, there is also a standard error attached to the
-calculation.</p>
+of parameters. WAIC, on the other hand <em>also</em> constructs a
+theoretical estimate of the relative out-of-sample KL divergence.
+However, this information criterion is much more general and does not
+assume the shape of the posterior (e.g. that it is a normal distribution
+like with AIC). WAIC works best with large samples because it allows it
+to compute the out-of-sample deviance that converges to the
+cross-validation approximation. Because WAIC is point-wise and
+predictions are considered case by case, there is also a standard error
+attached to the calculation.</p>
 <p>Both use the lppd, however, while AIC uses 2 times the number of free
-parameters in the equation, WAIC uses 2 times the penalty term.</p>
+parameters in the equation, WAIC uses 2 times the penalty term (a.k.a.
+effective number of parameters).</p>
 <p>If the priors are flat or the posterior prediction is normally
 distributed, then this will make the WAIC similar to the AIC.</p>
 <p><strong>7M2. Explain the difference between model selection and model
@@ -552,22 +553,22 @@ set.seed(94)
 
 WAIC(m, 10)</code></pre>
 <pre><code>##      WAIC      lppd  penalty  std_err
-## 1 424.455 -206.8984 5.329108 18.38067</code></pre>
+## 1 424.455 -206.8984 5.329113 18.38063</code></pre>
 <pre class="r"><code>WAIC(m, 100)</code></pre>
-<pre><code>##       WAIC      lppd  penalty  std_err
-## 1 421.6164 -207.1381 3.670041 16.46429</code></pre>
+<pre><code>##       WAIC      lppd penalty  std_err
+## 1 421.6164 -207.1381 3.67004 16.46426</code></pre>
 <pre class="r"><code>WAIC(m, 250)</code></pre>
 <pre><code>##       WAIC      lppd  penalty  std_err
-## 1 422.3494 -206.9051 4.269617 17.33104</code></pre>
+## 1 422.3493 -206.9051 4.269613 17.33101</code></pre>
 <pre class="r"><code>WAIC(m, 500)</code></pre>
 <pre><code>##       WAIC      lppd  penalty  std_err
-## 1 423.9456 -206.8557 5.117097 17.95408</code></pre>
+## 1 423.9456 -206.8557 5.117095 17.95405</code></pre>
 <pre class="r"><code>WAIC(m, 1000)</code></pre>
-<pre><code>##       WAIC      lppd  penalty  std_err
-## 1 422.2813 -206.9312 4.209428 17.15823</code></pre>
+<pre><code>##       WAIC      lppd  penalty std_err
+## 1 422.2813 -206.9312 4.209426 17.1582</code></pre>
 <pre class="r"><code>WAIC(m, 10000)</code></pre>
-<pre><code>##       WAIC      lppd  penalty  std_err
-## 1 423.1583 -206.9092 4.669983 17.58223</code></pre>
+<pre><code>##       WAIC      lppd  penalty std_err
+## 1 423.1583 -206.9092 4.669981 17.5822</code></pre>
 <p><strong>7M4. What happens to the effective number of parameters, as
 measured by PSIS or WAIC, as a prior becomes more concentrated? Why?
 Perform some experiments, if you are not sure.</strong><br />
@@ -628,7 +629,10 @@ WAIC(m4, 1000)</code></pre>
 <p>The more concentrated you make your priors (I did this by decreasing
 the size of the standard deviation - additionally, this means the model
 is becoming less flexible), the lower the penalty/risk (effective number
-of parameters) is.<br />
+of parameters) is. This makes sense as <em>moderately</em> restrictive
+(the more restrictive, the worse the prediction because the model
+becomes to dependent on pieces of data that are not actually regular to
+the model) priors help with over-fitting.<br />
 </p>
 <p><strong>7M5. Provide an informal explanation of why informative
 priors reduce over-fitting.</strong><br />
@@ -637,7 +641,7 @@ regularizing prior, we can reduce over-fitting. When we set an
 informative prior we are able to help the model capture what are seen as
 regular features of the model instead of just using every piece of
 information we get from the model. This way we prevent the model from
-learning too much from the data making it less flexible while making
+learning too much from the data, making it less flexible when making
 predictions.</p>
 <p><strong>7M6. Provide an informal explanation of why overly
 informative priors result in under-fitting.</strong><br />

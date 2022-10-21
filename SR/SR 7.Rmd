@@ -90,9 +90,9 @@ The uncertainty contained in the probability distribution for rolling this four-
 
 
 
-AIC is an information criterion that constructs a theoretical estimate of the relative out-of-sample KL divergence. AIC is only reliable when the priors are flat/overwhelmed by the likelihood, the posterior distribution is approximately (multivariate) normally distributed, and the sample size is (extremely) larger than the number of parameters. WAIC, on the other had also constructs a theoretical estimate of the relative out-of-sample KL divergence. However, this information criterion is much more general and does not assume the shape of the posterior (e.g. that it is a normal distribution like with AIC). WAIC works best with large samples because it allows it to compute the out-of-sample deviance that converges to the cross-validation approximation. Because WAIC is point-wise and predictions are considered case by case, there is also a standard error attached to the calculation. 
+AIC is an information criterion that constructs a theoretical estimate of the relative out-of-sample KL divergence. AIC is only reliable when the priors are flat/overwhelmed by the likelihood, the posterior distribution is approximately (multivariate) normally distributed, and the sample size is (extremely) larger than the number of parameters. WAIC, on the other hand *also* constructs a theoretical estimate of the relative out-of-sample KL divergence. However, this information criterion is much more general and does not assume the shape of the posterior (e.g. that it is a normal distribution like with AIC). WAIC works best with large samples because it allows it to compute the out-of-sample deviance that converges to the cross-validation approximation. Because WAIC is point-wise and predictions are considered case by case, there is also a standard error attached to the calculation. 
 
-Both use the lppd, however, while AIC uses 2 times the number of free parameters in the equation, WAIC uses 2 times the penalty term. 
+Both use the lppd, however, while AIC uses 2 times the number of free parameters in the equation, WAIC uses 2 times the penalty term (a.k.a. effective number of parameters). 
 
 If the priors are flat or the posterior prediction is normally distributed, then this will make the WAIC similar to the AIC. 
 
@@ -186,10 +186,10 @@ set.seed(1994)
 WAIC(m4, 1000)
 
 ```
-The more concentrated you make your priors (I did this by decreasing the size of the standard deviation - additionally, this means the model is becoming less flexible), the lower the penalty/risk (effective number of parameters) is.\
+The more concentrated you make your priors (I did this by decreasing the size of the standard deviation - additionally, this means the model is becoming less flexible), the lower the penalty/risk (effective number of parameters) is. This makes sense as *moderately* restrictive (the more restrictive, the worse the prediction because the model becomes to dependent on pieces of data that are not actually regular to the model) priors help with over-fitting. \
 
 **7M5. Provide an informal explanation of why informative priors reduce over-fitting.**\
-When we utilize an informed prior by being skeptical/using a regularizing prior, we can reduce over-fitting. When we set an informative prior we are able to help the model capture what are seen as regular features of the model instead of just using every piece of information we get from the model. This way we prevent the model from learning too much from the data making it less flexible while making predictions. 
+When we utilize an informed prior by being skeptical/using a regularizing prior, we can reduce over-fitting. When we set an informative prior we are able to help the model capture what are seen as regular features of the model instead of just using every piece of information we get from the model. This way we prevent the model from learning too much from the data, making it less flexible when making predictions. 
 
 **7M6. Provide an informal explanation of why overly informative priors result in under-fitting.**\
 If we provide an overly informative prior will be so restrictive that the model learns too little from the data (doesn't learn all of the regular features of the sample) causing it to also make bad predictions. 
