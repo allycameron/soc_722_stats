@@ -529,6 +529,11 @@ happen to the information criterion values, if the models were fit to
 different numbers of observations? Perform some experiments, if you are
 not sure.</strong><br />
 </p>
+<p>The more observations used in the WAIC calculation, the larger the
+WAIC becomes. This can make it seem as though a model is better than it
+actually is when actually comparing. Instead, to give every model a fair
+chance you should use the same number of observations in
+calculations.</p>
 <pre class="r"><code># we&#39;re going to use the cars data from the book 
 # but compute WAIC on different numbers of observations
 
@@ -546,23 +551,23 @@ m &lt;- quap(
 set.seed(94)
 
 WAIC(m, 10)</code></pre>
-<pre><code>##       WAIC      lppd  penalty  std_err
-## 1 424.4555 -206.8983 5.329398 18.38014</code></pre>
+<pre><code>##      WAIC      lppd  penalty  std_err
+## 1 424.455 -206.8984 5.329108 18.38067</code></pre>
 <pre class="r"><code>WAIC(m, 100)</code></pre>
-<pre><code>##       WAIC     lppd  penalty std_err
-## 1 421.6161 -207.138 3.670097 16.4638</code></pre>
+<pre><code>##       WAIC      lppd  penalty  std_err
+## 1 421.6164 -207.1381 3.670041 16.46429</code></pre>
 <pre class="r"><code>WAIC(m, 250)</code></pre>
 <pre><code>##       WAIC      lppd  penalty  std_err
-## 1 422.3493 -206.9051 4.269558 17.33036</code></pre>
+## 1 422.3494 -206.9051 4.269617 17.33104</code></pre>
 <pre class="r"><code>WAIC(m, 500)</code></pre>
 <pre><code>##       WAIC      lppd  penalty  std_err
-## 1 423.9455 -206.8556 5.117134 17.95349</code></pre>
+## 1 423.9456 -206.8557 5.117097 17.95408</code></pre>
 <pre class="r"><code>WAIC(m, 1000)</code></pre>
 <pre><code>##       WAIC      lppd  penalty  std_err
-## 1 422.2813 -206.9312 4.209448 17.15765</code></pre>
+## 1 422.2813 -206.9312 4.209428 17.15823</code></pre>
 <pre class="r"><code>WAIC(m, 10000)</code></pre>
 <pre><code>##       WAIC      lppd  penalty  std_err
-## 1 423.1583 -206.9091 4.670024 17.58165</code></pre>
+## 1 423.1583 -206.9092 4.669983 17.58223</code></pre>
 <p><strong>7M4. What happens to the effective number of parameters, as
 measured by PSIS or WAIC, as a prior becomes more concentrated? Why?
 Perform some experiments, if you are not sure.</strong><br />
@@ -621,8 +626,9 @@ WAIC(m4, 1000)</code></pre>
 <pre><code>##      WAIC      lppd  penalty  std_err
 ## 1 429.545 -211.0108 3.761682 19.48021</code></pre>
 <p>The more concentrated you make your priors (I did this by decreasing
-the size of the standard deviation), the lower the penalty (effective
-number of parameters) is.<br />
+the size of the standard deviation - additionally, this means the model
+is becoming less flexible), the lower the penalty/risk (effective number
+of parameters) is.<br />
 </p>
 <p><strong>7M5. Provide an informal explanation of why informative
 priors reduce over-fitting.</strong><br />

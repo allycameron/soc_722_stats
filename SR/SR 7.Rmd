@@ -1,0 +1,195 @@
+---
+title: "SR 7"
+author: "Allyson Cameron"
+date: "2022-10-18"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Before we start, let's go ahead and make sure we have everything we need.
+
+```{r}
+# load in packages
+library(tidybayes)
+library(tidybayes.rethinking)
+library(dplyr)
+library(rethinking)
+```
+
+# Easy Questions\ 
+**7E1. State the three motivating criteria that define information entropy. Try to express each in your own words.**\
+
+1. We need whatever we use to measure uncertainty to be continuous, not discrete.\ 
+2. When we increase the number of possible events we are working with, the measure of uncertainty should increase as well because we have more kinds of events to predict which is a harder task. \
+3. We want the measures of uncertainty to be able to be added. This means if we measured the uncertainty of two events then two other events, we should be able to add the two uncertainties we measured together to produce the uncertainty of all of the combination from those four events. \
+
+**7E2. Suppose a coin is weighted such that, when it is tossed and lands on a table, it comes up heads 70% of the time. What is the entropy of this coin?**\
+
+```{r}
+# let's start by noting what the probability is of H or T
+
+p_H <- 0.7
+p_T <- 0.3
+
+# next, let's create our list of probabilities, p
+
+p <- c(p_H, p_T)
+
+# now we follow the formula for entropy given on page 206
+-sum(p * log(p))
+```
+The uncertainty contained in the probability distribution for flipping this coin is 0.61.
+
+**7E3. Suppose a four-sided die is loaded such that, when tossed onto a table, it shows “1” 20%, “2” 25%, “3” 25%, and “4” 30% of the time. What is the entropy of this die?**\
+```{r}
+# let's start by noting  the probabilities of each side
+
+p_1 <- 0.20
+p_2 <- 0.25
+p_3 <- 0.25
+p_4 <- 0.30
+
+# next, let's create our list of probabilities, p(2)
+
+p2 <- c(p_1, p_2, p_3, p_4)
+
+# now we follow the formula for entropy given on page 206
+-sum(p2*log(p2))
+
+```
+
+The uncertainty contained in the probability distribution for rolling this four-sided die is 1.38.
+
+**7E4. Suppose another four-sided die is loaded such that it never shows “4”. The other three sides show equally often. What is the entropy of this die?**\
+```{r}
+
+# we learn in the overthinking box on page 206-207 when the proability
+# of an event is 0, we can drop it from our model
+p_1a <- 1/3
+p_2a <- 1/3
+p_3a <- 1/3
+
+# next, let's create our list of probabilities, p(3)
+
+p3 <- c(p_1a, p_2a, p_3a)
+
+# now we follow the formula for entropy given on page 206
+-sum(p3*log(p3))
+
+```
+The uncertainty contained in the probability distribution for rolling this four-sided die where 4 is never rolled is 1.09.\
+
+# Medium Questions\
+
+**7M1. Write down and compare the definitions of AIC and WAIC. Which of these criteria is most general? Which assumptions are required to transform the more general criterion into a less general one?**\
+
+
+
+AIC is an information criterion that constructs a theoretical estimate of the relative out-of-sample KL divergence. AIC is only reliable when the priors are flat/overwhelmed by the likelihood, the posterior distribution is approximately (multivariate) normally distributed, and the sample size is (extremely) larger than the number of parameters. WAIC, on the other had also constructs a theoretical estimate of the relative out-of-sample KL divergence. However, this information criterion is much more general and does not assume the shape of the posterior (e.g. that it is a normal distribution like with AIC). WAIC works best with large samples because it allows it to compute the out-of-sample deviance that converges to the cross-validation approximation. Because WAIC is point-wise and predictions are considered case by case, there is also a standard error attached to the calculation. 
+
+Both use the lppd, however, while AIC uses 2 times the number of free parameters in the equation, WAIC uses 2 times the penalty term. 
+
+If the priors are flat or the posterior prediction is normally distributed, then this will make the WAIC similar to the AIC. 
+
+**7M2. Explain the difference between model selection and model comparison. What information is lost under model selection?**\
+
+Model selection means choosing the model with the lowest criterion value and then getting rid of all the other models. When you get rid of the other models, you discard the relative model accuracies that you could have gained from doing a comparison across the models. Comparing across models allows you to gain advice about how confident you can be about models. Further, model comparison is a more general approach that allows us to use multiple models to understand how different variables influence predictions. Another strength of doing a model comparison is that with a causal model we can also utilize implied conditional independencies among variables to infer causal relationships. 
+
+
+**7M3. When comparing models with an information criterion, why must all models be fit to exactly the same observations? What would happen to the information criterion values, if the models were fit to different numbers of observations? Perform some experiments, if you are not sure.**\
+
+The more observations used in the WAIC calculation, the larger the WAIC becomes. This can make it seem as though a model is better than it actually is when actually comparing. Instead, to give every model a fair chance you should use the same number of observations in calculations. 
+
+```{r}
+# we're going to use the cars data from the book 
+# but compute WAIC on different numbers of observations
+
+data(cars)
+m <- quap(
+  alist(
+    dist ~ dnorm(mu, sigma),
+    mu <- a + b * speed,
+    a ~ dnorm(0, 100),
+    b ~ dnorm(0, 10),
+    sigma ~ dexp(1)
+  ),
+  data = cars
+)
+set.seed(94)
+
+WAIC(m, 10)
+WAIC(m, 100)
+WAIC(m, 250)
+WAIC(m, 500)
+WAIC(m, 1000)
+WAIC(m, 10000)
+
+```
+
+**7M4. What happens to the effective number of parameters, as measured by PSIS or WAIC, as a prior becomes more concentrated? Why? Perform some experiments, if you are not sure.**\
+
+```{r}
+# let's use the same data and just change the priors and 
+# see what happens to the penalty term
+
+data(cars)
+m2 <- quap(
+  alist(
+    dist ~ dnorm(mu, sigma),
+    mu <- a + b * speed,
+    a ~ dnorm(0, 100),
+    b ~ dnorm(0, 10),
+    sigma ~ dexp(1)
+  ),
+  data = cars
+)
+set.seed(1994)
+
+WAIC(m2, 1000)
+
+
+# round 2
+m3 <- quap(
+  alist(
+    dist ~ dnorm(mu, sigma),
+    mu <- a + b * speed,
+    a ~ dnorm(0, 10),
+    b ~ dnorm(0, 1),
+    sigma ~ dexp(1)
+  ),
+  data = cars
+)
+
+set.seed(1994)
+
+WAIC(m3, 1000)
+
+# round 3
+m4 <- quap(
+  alist(
+    dist ~ dnorm(mu, sigma),
+    mu <- a + b * speed,
+    a ~ dnorm(0, 1),
+    b ~ dnorm(0, .5),
+    sigma ~ dexp(1)
+  ),
+  data = cars
+)
+
+set.seed(1994)
+
+WAIC(m4, 1000)
+
+```
+The more concentrated you make your priors (I did this by decreasing the size of the standard deviation - additionally, this means the model is becoming less flexible), the lower the penalty/risk (effective number of parameters) is.\
+
+**7M5. Provide an informal explanation of why informative priors reduce over-fitting.**\
+When we utilize an informed prior by being skeptical/using a regularizing prior, we can reduce over-fitting. When we set an informative prior we are able to help the model capture what are seen as regular features of the model instead of just using every piece of information we get from the model. This way we prevent the model from learning too much from the data making it less flexible while making predictions. 
+
+**7M6. Provide an informal explanation of why overly informative priors result in under-fitting.**\
+If we provide an overly informative prior will be so restrictive that the model learns too little from the data (doesn't learn all of the regular features of the sample) causing it to also make bad predictions. 
