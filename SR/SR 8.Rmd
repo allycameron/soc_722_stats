@@ -11,14 +11,16 @@ knitr::opts_chunk$set(echo = TRUE)
 
 **8E1. For each of the causal relationships below, name a hypothetical third variable that would lead to an interaction effect.**\
 
-[add conneciton between independent variables]
+1.  Bread dough rises because of yeast.\
+    Alcohol has a relationship with amount of yeast in the dough, the two together also impact the dough. Alcohol thus also is another reason that dough may rise.\
 
-(1) Bread dough rises because of yeast.\
-    Temperature/heat is another reason that dough may rise.\
-(2) Education leads to higher income.\
-    Gender can also lead to a higher income because it makes the return for educaiton higher for men versus women.\
-(3) Gasoline makes a car go.\
-    The tires/wheels also make a car go.\
+```{=html}
+<!-- -->
+```
+(1) Education leads to higher income.\
+    Gender can also lead to a higher income because it makes the return for education higher for men versus women.\
+(2) Gasoline makes a car go.\
+    Engine oil and gasoline have a relationship to both impacting the functioning of the car. Low quality engine oil while having gasoline create a different functioning car then a car with a high quality engine oil. Engine oil is thus also another reason that a car functions. \
 
 **8E2. Which of the following explanations invokes an interaction?**\
 (1) Caramelizing onions requires cooking over low heat and making sure the onions do not dry out.\
