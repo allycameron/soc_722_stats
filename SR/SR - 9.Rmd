@@ -1,0 +1,448 @@
+---
+title: "SR Chapter 9"
+author: "Allyson Cameron"
+date: "2022-11-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Easy Questions\
+
+**9E1. Which of the following is a requirement of the simple Metropolis algorithm?**\
+**(1) The parameters must be discrete.**\
+The parameters for Metropolis algorithm can be discrete or they can take on a continuous range of values.\
+**(2) The likelihood function must be Gaussian.**\
+One of the main pros of using MCM is that we do not have to know the shape of the posterior distribution.\
+**(3) The proposal distribution must be symmetric.**\
+This is a requirement for the simple Metropolis algorithm.\
+
+**9E2. Gibbs sampling is more efficient than the Metropolis algorithm. How does it achieve this extra efficiency? Are there any limitations to the Gibbs sampling strategy?**\
+The Gibbs sampling is more efficient than the Metropolis algorithm because it can get a good estimate of the posterior with fewer samples than with the simple Metropolis algorithm. How does it do this/ It uses adaptive proposals where the distribution of proposed parameter values adjust depending upon the parameter values at the moment by using particular combination of prior distributions and likelihoods. There are two main limitations to the Gibbs sampling strategy. \
+
+1) You may not want to use conjugate priors.\
+2) as models become more complex and contain way more parameters this sampling method can still become ineffective. why? because they tend to get stuck in small regions of the posterior for a long time. This happens mostly because the models with a lot of parameters have regions of high correlation in the posterior leading to this method making dumb proposals of where to go next.\
+
+
+**9E3. Which sort of parameters can Hamiltonian Monte Carlo not handle? Can you explain why?**\
+Hamiltonian Mote Carlo can only handle continuous parameters, meaning it cannot handle discrete parameters. This Hamiltonian Monte Carlo method uses a physics simulation that requires that the "vehicle' can stop at any point and glide across the surgace of the log-posterior instead of "jumping" from one discrete location to the next". That is what makes this method different. 
+
+**9E4. Explain the difference between the effective number of samples, `n_eff` as calculated by Stan, and the actual number of samples.**\
+
+The `n_eff` is the effective number of samples meaning it answers the question: "how long would the chain be, if each sample was independent of the one before it?". This question hints at what is different about this versus the actual number of samples. Markov chains are usually auto-correlated meaning they are not independent.... this means that the raw number of samples is influenced by this dependence of the samples while the effective number of samples are not. Additionally, the effective number of samples is nearly always smaller than the number of samples taken.\
+
+**9E5. Which value should `Rhat` approach, when a chain is sampling the posterior distribution correctly?**\
+The $\hat{R}$ should approach 1 from above when the chain is sampling the posterior distribution correctly. When $\hat{R}$ is above one it usually indicates that the chain has not yet converged and you shouldn't trust the samples produced. \
+
+**9E6. Sketch a good trace plot for a Markov chain, one that is effectively sampling from the posterior distribution. What is good about its shape? Then sketch a trace plot for a malfunctioning Markov chain. What about its shape indicates malfunction?**\
+
+```{r}
+# first let's define what the model will try to estimate
+library(rethinking)
+y <- (c(-2, 2))
+
+# now we can create our models,
+# I will create one with extremely flat priors first
+# to show a malfunctioning Markov chain
+set.seed(1101)
+p <- ulam(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu <- a,
+    a ~ dnorm(0, 1000),
+    sigma ~ dexp(0.0001)
+  ),
+  data = list(y = y), chains = 3, cores = 3
+)
+
+precis(p)
+# this is not good, we made our a centered on 0 and it is no where near that
+# also the sigma looks insane
+
+# let's make a trace plot
+
+traceplot(p)
+```
+
+With the extremely flat priors, you can see that the chains are sampling extreme and implausible values (see that alpha is sample all the way into the 1500s for values....). These chains are not healthy. A healthy chain will have "tighter" distribution, thus convergence.\
+
+Let's look at healthy chains. \
+
+```{r}
+# again let's define what the model will try to estimate
+y <- c(-2, 2)
+
+# now we can create our models,
+# I will create one with weakly regularizing priors
+# alpha will still be almost flat, but not extremely flat, and now centered around 1
+set.seed(1101)
+p2 <- ulam(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu <- a,
+    a ~ dnorm(1, 10),
+    sigma ~ dexp(1)
+  ),
+  data = list(y = y), chains = 3, cores = 3
+)
+
+precis(p2)
+# this looks much better, the sigma is way smaller
+# and at least the alpha is somehwere near 0
+
+
+# let's make a traceplot
+
+traceplot(p2)
+```
+
+The first thing I notice is the warning message about divergent transitions is gone, this is a good sign. Next, looking at the values from the `precis()` we see that the sigma is way smaller and the alpha falls within the expect range which is also great. Lastly, looking at the trace plots, we can see that they look much healthier. The sampling is not occurring out into the thousands and the chains are stable/stationary are the same values.\
+
+**9E7. Repeat the problem above, but now for a trace rank plot.**\
+
+Now let's just insert p and p2 into `trankplot` and observe. (Well in a different R-universe I would, but I did something that will give me the trace rank plot - thank you Nico again :)  )
+
+```{r}
+library(bayesplot)
+library(aptheme)
+
+# round one
+
+# get the stan code
+model_stan <- stancode(p)
+
+# fit the model in stan
+model_fit <- stan(model_code = model_stan, data = list(y = y))
+
+# then to make the trank plot use this code
+mcmc_rank_overlay(model_fit) + theme_ap(family = "")
+
+# round two
+
+# get the stan code
+model_stan2 <- stancode(p2)
+
+# fit the model in stan
+model_fit2 <- stan(model_code = model_stan2, data = list(y = y))
+
+# then to make the trank plot use this code
+mcmc_rank_overlay(model_fit2) + theme_ap(family = "")
+```
+
+In the first trace plot, we see that the chains do not stay within the same range. Some of the chains start up at 200. There seems to not be convergence.\
+
+For the second trace plot, we see that the chains look way more healthy. They all stay within the same range which is great!\
+
+## Medium Questions\
+**9M1. Re-estimate the terrain ruggedness model from the chapter, but now using a uniform prior for the standard deviation, sigma. The uniform prior should be dunif(0,1). Use `ulam` to estimate the posterior. Does the different prior have any detectable influence on the posterior distribution of sigma? Why or why not?**\
+
+
+```{r}
+# first lets load the data and manipulate them as needed
+library(tidybayes.rethinking)
+library(tidyverse)
+library(tidybayes)
+data(rugged)
+d <- tibble(rugged)
+d <- d %>%
+  drop_na(rgdppc_2000) %>%
+  mutate(log_gdp = log(rgdppc_2000)) %>%
+  mutate(log_gdp_std = log_gdp / mean(log_gdp)) %>%
+  mutate(rugged_std = rugged / max(rugged)) %>%
+  mutate(cid = ifelse(cont_africa == 1, 1, 2))
+
+# next, we will select only the things we need for our model
+d <- d %>%
+  mutate(cid = as.integer(cid)) %>%
+  select(log_gdp_std, rugged_std, cid)
+
+# next, sample from the posterior with ulam, copying exact code
+r <- ulam(
+  alist(
+    log_gdp_std ~ dnorm(mu, sigma),
+    mu <- a[cid] + b[cid] * (rugged_std - 0.215),
+    a[cid] ~ dnorm(1, 0.1),
+    b[cid] ~ dnorm(0, 0.3),
+    sigma ~ dexp(1)
+  ),
+  data = d, chains = 4, cores = 4
+)
+
+# now we will run the same model but with the sigma changed
+
+r2 <- ulam(
+  alist(
+    log_gdp_std ~ dnorm(mu, sigma),
+    mu <- a[cid] + b[cid] * (rugged_std - 0.215),
+    a[cid] ~ dnorm(1, 0.1),
+    b[cid] ~ dnorm(0, 0.3),
+    sigma ~ dunif(0, 1)
+  ),
+  data = d, chains = 4, cores = 4
+)
+
+
+precis(r, depth = 2)
+traceplot(r)
+# get the stan code
+model_stan3 <- stancode(r)
+
+# fit the model in stan
+model_fit3 <- stan(model_code = model_stan3, data = d)
+
+# then to make the trank plot use this code
+mcmc_rank_overlay(model_fit3)  + theme_ap(family = "")
+
+precis(r2, depth = 2)
+traceplot(r2)
+
+# get the stan code
+model_stan4 <- stancode(r2)
+
+# fit the model in stan
+model_fit4 <- stan(model_code = model_stan4, data = d)
+
+# then to make the trank plot use this code
+mcmc_rank_overlay(model_fit4) + theme_ap(family = "")
+```
+
+
+```{r}
+# let's run a prior simulation
+# and look at the posterior of the two sigmas
+
+# prior
+x2 <- runif(1e4, 0, 1)
+x <- rexp(1e4, 1)
+
+dens(x2, main = "Priors", xlab = "", ylab = "")
+dens(x, add = TRUE)
+# posterior
+xa <- tidy_draws(r)
+x2a <- tidy_draws(r2)
+dens(xa$sigma,
+  main = "Posterior", xlab = "", ylab = "",
+  ylim = c(0, 70)
+)
+dens(x2a$sigma, add = TRUE, )
+```
+
+The different prior doesn't seem to have a detectable difference on the posterior distribution. I believe this is because even though the shapes of the priors are different, once the samples are taken from the posterior, we see that the shapes seems to become almost identical Maybe this is due to the amount of data present? I am not sure. However, I think there is no difference because the shapes are similar. \
+
+**9M2. Modify the terrain ruggedness model again. This time, change the prior for `b[cid]` to dexp(0.3).What does this do to the posterior distribution? Can you explain it?**\
+
+```{r}
+# again lets have the data
+data(rugged)
+d2 <- tibble(rugged)
+d2 <- d2 %>%
+  mutate(log_gdp = log(rgdppc_2000)) %>%
+  drop_na(rgdppc_2000) %>%
+  mutate(log_gdp_std = log_gdp / mean(log_gdp)) %>%
+  mutate(rugged_std = rugged / max(rugged)) %>%
+  mutate(cid = ifelse(cont_africa == 1, 1, 2))
+
+# next, we will select only the things we need for our model
+d2 <- d2 %>%
+  select(log_gdp_std, rugged_std, cid)
+
+# next, sample from the posterior with ulam, copying exact code
+rb <- ulam(
+  alist(
+    log_gdp_std ~ dnorm(mu, sigma),
+    mu <- a[cid] + b[cid] * (rugged_std - 0.215),
+    a[cid] ~ dnorm(1, 0.1),
+    b[cid] ~ dnorm(0, 0.3),
+    sigma ~ dexp(1)
+  ),
+  data = d2, chains = 4, cores = 4
+)
+
+# now we will run the same model but with the sigma changed
+
+rb2 <- ulam(
+  alist(
+    log_gdp_std ~ dnorm(mu, sigma),
+    mu <- a[cid] + b[cid] * (rugged_std - 0.215),
+    a[cid] ~ dnorm(1, 0.1),
+    b[cid] ~ dexp(0.3),
+    sigma ~ dexp(1)
+  ),
+  data = d2, chains = 4, cores = 4
+)
+
+
+precis(rb, depth = 2)
+traceplot(rb)
+
+precis(rb2, depth = 2)
+traceplot(rb2)
+```
+
+```{r}
+# let's run a prior simulation
+# and look at the posterior of the two sigmas
+
+# prior
+set.seed(1103)
+xb <- rnorm(1e4, 0, 0.3)
+xb2 <- rexp(1e4, 0.3)
+
+dens(xb2,
+  main = "Priors", xlab = "", ylab = "",
+  ylim = c(0, 1.4)
+)
+dens(xb, add = TRUE)
+# posterior
+xab <- tidy_draws(rb)
+x2ab <- tidy_draws(rb2)
+
+dens(xab$`b[1]`,
+  main = "Posterior for continents in Africa",
+  xlab = "", ylab = "", ylim = c(0, 5.5)
+)
+dens(x2ab$`b[1]`, add = TRUE)
+
+dens(xab$`b[2]`,
+  main = "Posterior for continents not in Africa",
+  xlab = "", ylab = "", ylim = c(0, 40)
+)
+dens(x2ab$`b[2]`, add = TRUE)
+```
+
+Once again, the different prior doesn't seem to have a detectable difference on the posterior distribution (maybe slightly for b[2]). I believe, once again, this is because even though the shapes of the priors are different, once the samples are taken from the posterior, we see that the shapes seems to become almost identical More evidence that this is true is tahat we see the posterior for b[2] is not similar is manifested by the difference present in `precis` function. 
+
+**9M3. Re-estimate one of the Stan models from the chapter, but at different numbers of warm-up iterations. Be sure to use the same number of sampling iterations in each case. Compare the `n_eff` values. How much warm-up is enough?**\
+
+```{r}
+# let's just go ahead and continue with what we did above in E6
+
+y <- c(-2, 2)
+
+# model 1 with 1 warm up sequence
+set.seed(1101)
+m1 <- ulam(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu <- a,
+    a ~ dnorm(1, 10),
+    sigma ~ dexp(1)
+  ),
+  data = list(y = y), chains = 1, warmup = 1, iter = 1000
+)
+# model 2 with 5 warm up sequence
+set.seed(1102)
+m2 <- ulam(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu <- a,
+    a ~ dnorm(1, 10),
+    sigma ~ dexp(1)
+  ),
+  data = list(y = y), chains = 1, warmup = 5, iter = 1000
+)
+
+
+# model 3 qith 25 warm up sequence
+set.seed(1103)
+m3 <- ulam(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu <- a,
+    a ~ dnorm(1, 10),
+    sigma ~ dexp(1)
+  ),
+  data = list(y = y), chains = 1, warmup = 25, iter = 1000
+)
+
+# model 4 with 50 warm up sequence
+set.seed(1104)
+m4 <- ulam(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu <- a,
+    a ~ dnorm(1, 10),
+    sigma ~ dexp(1)
+  ),
+  data = list(y = y), chains = 1, warmup = 50, iter = 1000
+)
+
+# model 5 with 100 warm up sequence
+set.seed(1105)
+m5 <- ulam(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu <- a,
+    a ~ dnorm(1, 10),
+    sigma ~ dexp(1)
+  ),
+  data = list(y = y), chains = 1, warmup = 100, iter = 1000
+)
+
+# model 6 with 150 warm up sequence
+set.seed(1106)
+m6 <- ulam(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu <- a,
+    a ~ dnorm(1, 10),
+    sigma ~ dexp(1)
+  ),
+  data = list(y = y), chains = 1, warmup = 150, iter = 1000
+)
+
+# model 7 with 200 warm up sequence
+set.seed(1107)
+m7 <- ulam(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu <- a,
+    a ~ dnorm(1, 10),
+    sigma ~ dexp(1)
+  ),
+  data = list(y = y), chains = 1, warmup = 200, iter = 1000
+)
+
+# model 8 with 500 warm up sequence
+set.seed(1108)
+m8 <- ulam(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu <- a,
+    a ~ dnorm(1, 10),
+    sigma ~ dexp(1)
+  ),
+  data = list(y = y), chains = 1, warmup = 500, iter = 1000
+)
+```
+
+Notice how with the first model (m1) there is an error message:\
+WARNING: There aren't enough warmup iterations to fit the\
+Chain 4:          three stages of adaptation as currently configured.\
+Chain 4:          Reducing each adaptation stage to 15%/75%/10% of \
+Chain 4:          the given number of warmup iterations:\
+
+Again, with models m2, m3, and m4 we see the same error message. \
+ 
+However, with m5 we do not get this same error message. This leads me to believe (without yet checking the `precis()`) that the acceptable warmup sequence for this model is somewhere between 100 ad 150. \
+
+Notice, once we use 500 (m6) now it says this error message: \
+
+Bulk Effective Samples Size (ESS) is too low, indicating posterior means and medians may be unreliable. \
+ 
+Let's look at the `precis()` for each model to find out more. \
+
+```{r}
+precis(m1)
+precis(m2)
+precis(m3)
+precis(m4)
+precis(m5)
+precis(m6)
+precis(m7)
+precis(m8)
+```
+
+Looking at the `n_eff` values, at first we see the values are very unstable and changing with every model considerable. After the warning messages began to stop (at m4 and on) we can see the `n_eff` values become more stable and do not change as much. 
