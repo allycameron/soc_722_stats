@@ -82,7 +82,7 @@ p2 <- ulam(
   alist(
     y ~ dnorm(mu, sigma),
     mu <- a,
-    a ~ dnorm(1, 10),
+    a ~ dnorm(0, 10),
     sigma ~ dexp(1)
   ),
   data = list(y = y), chains = 3, cores = 3
@@ -290,6 +290,7 @@ set.seed(1103)
 xb <- rnorm(1e4, 0, 0.3)
 xb2 <- rexp(1e4, 0.3)
 
+#priors
 dens(xb2,
   main = "Priors", xlab = "", ylab = "",
   ylim = c(0, 1.4)
@@ -298,13 +299,13 @@ dens(xb, add = TRUE)
 # posterior
 xab <- tidy_draws(rb)
 x2ab <- tidy_draws(rb2)
-
+# Africa
 dens(xab$`b[1]`,
   main = "Posterior for continents in Africa",
   xlab = "", ylab = "", ylim = c(0, 5.5)
 )
 dens(x2ab$`b[1]`, add = TRUE)
-
+#not Africa
 dens(xab$`b[2]`,
   main = "Posterior for continents not in Africa",
   xlab = "", ylab = "", ylim = c(0, 40)
