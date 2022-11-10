@@ -1,0 +1,37 @@
+---
+title: "Questions I Have"
+author: "Allyson Cameron"
+date: "2022-11-10"
+output:
+  pdf_document: default
+  html_document: default
+---
+## Here are some of the questions I have. I have more than 3. I will list the most pressing ones first, and still add in my other ones here. 
+
+1. In chapter 3 they talk about sampling to summarize. There are 3 examples: intervals of defined boundaries, intervals of defined mass, and PI and HPDI. I would like a better conceptual understanding of the these three types of summarizing and their purpose. (pg. 53)\
+
+2. how does dSE show us which model is "better" and what is the relationship between n_eff and the warmup sequence (chapter 8 and 9)?\
+
+3. what are the features of a regularizing prior? (I think it means a flat alpha and narrow beta - pg. 214 and 215)\
+
+4. Can we go over the five types of uncertainty that go into a model again? (from demo 5)\
+
+## Other questions:\
+5. For the counter-factual models in chapter 5, they say that A is manipulated in the example code. However, I am confused on how? What does it mean to manipulate a variable in the code? (pg. 141)\
+
+6.  can we go over backdoor paths? I thought that that meant when X is the outcome not the predictor, but later on he discusses controlling for things when X is the predictor and there are colliders or confounders etc. \
+
+7.  I need more clarification on how Bayes theorem works.\
+
+8.  Why do/when do we use splines (and what really are they)?\
+
+9.  What does it mean to "average over the posterior" (page 138).\
+
+10.  Can we go over training deviance vs. test deviance? I don't understand the difference or what those two concepts really mean. (chapter 7)\
+
+11. how does WAIC have greater bias than PSIS and CV? (also chapter 7)\
+
+12. Can we go over what main effects are?\
+
+
+
