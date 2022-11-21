@@ -1,0 +1,753 @@
+---
+title: "Overall Notes"
+author: "Allyson Cameron"
+date: "2022-10-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+# some stuff you will never need
+# install.packages("gitcreds")
+# gitcreds::gitcreds_set()
+library(rethinking)
+library(tidybayes.rethinking)
+library(ggplot2)
+library(dplyr)
+library(tidybayes)
+library(tidyr)
+library(tidyverse)
+# install.packages("lme4")
+library(lme4)
+```
+
+
+# Chapter 3
+
+Use samples to summarize and simulate model output
+
+```{r}
+
+# here is our grid approximation of the water data.
+
+p_grid <- seq(from = 0, to = 1, length.out = 1000)
+prob_p <- rep(1, 1000)
+prob_data <- dbinom(6, size = 9, prob = p_grid)
+# 6 /9 is our likelihood of water ^
+posterior <- prob_data * prob_p
+posterior <- posterior / sum(posterior)
+
+# now let's see sampling
+```
+
+I think this is how you go about doing a prior predictive simulation using quap
+
+first our model: 
+
+$$
+\begin{aligned}
+weight^*_i &\sim \text{Normal}(\mu_i, \sigma) \\
+\mu_i &= \alpha + \beta \: height^*_i \\ 
+\alpha &= 0 \\ 
+\beta &\sim \text{Lognormal}(0,1) \\
+\sigma &\sim \text{Uniform}(0,30) 
+\end{aligned}
+$$
+
+
+```{r}
+# how many fake lines?
+nsims <- 12
+# simulate some lines (and sigmas)
+set.seed(0929)
+sims2 <- tibble(
+  id = 1:nsims,
+  a = rep(0, nsims),
+  b = rlnorm(nsims, meanlog = 0, sdlog = 1),
+  sigma = runif(nsims, min = 0, max = 30)
+)
+# here are the fake lines (and sigmas)
+head(sims2, nsims)
+```
+
+We can plot these lines.
+
+```{r}
+ggplot(sims2) +
+  geom_abline(
+    aes(
+      color = factor(id),
+      slope = b,
+      intercept = a
+    ),
+    size = 1.5,
+    alpha = .7
+  ) +
+  xlim(-20, 20) +
+  ylim(-20, 20) +
+  labs(
+    x = "height",
+    y = "weight"
+  ) +
+  theme(legend.position = "none") +
+  theme(aspect.ratio = 1)
+```
+
+# Chapter 4
+
+Posterior distribution of a linear model plotted against data with uncertainty = posterior predictive check.
+
+```{r}
+# 4.42 load data again, since it's a long way back
+library(rethinking)
+data(Howell1)
+d <- Howell1
+d2 <- d[d$age >= 18, ]
+d2 <- d2 |>
+  mutate(
+    height_z = standardize(height),
+    weight_z = standardize(weight)
+  )
+
+# define the average weight,x-bar
+xbar <- mean(d2$weight)
+# fit model
+
+m4.3 <- quap(
+  alist(
+    weight_z ~ dnorm(mu, sigma),
+    mu <- a + b * (height_z),
+    a ~ dnorm(178, 20),
+    b ~ dlnorm(0, 1),
+    sigma ~ dunif(0, 50)
+  ),
+  data = d2
+)
+
+draws <- tidy_draws(m4.3, 100)
+
+# plot OG data and predcited lines
+
+p <- ggplot(draws) +
+  geom_abline(
+    aes(
+      slope = b,
+      intercept = a
+    ),
+    size = .2,
+    alpha = .2
+  ) +
+  geom_point(data = d2, mapping = aes(x = height_z, y = weight_z), alpha = .2)
+
+p
+# adding uncertainty
+
+# predicted draws grabs same values as before, but also with sigma attached
+ppsims <- predicted_draws(m4.3,
+  newdata = d2,
+  draws = 1000
+)
+head(ppsims, 20)
+View(ppsims)
+
+# now we are using that stuff to make our boundaries for our plot
+ppsims <- ppsims |>
+  group_by(.row) |>
+  mutate(
+    lo_bound = HPDI(.prediction)[1],
+    up_bound = HPDI(.prediction)[2]
+  )
+
+p + geom_ribbon(
+  data = ppsims,
+  mapping = aes(
+    x = height_z,
+    ymax = up_bound,
+    ymin = lo_bound
+  ),
+  alpha = .1
+) +
+  labs(caption = "with 89% HPDI overlaid")
+```
+
+Let's learn more about link and apply. They are used to help generate predictions from the posterior
+
+
+```{r}
+mu <- link(m4.3)
+str(mu)
+View(mu)
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI, prob = 0.89)
+mu.HPDI <- apply(mu, 2, HPDI, prob = 0.89)
+```
+
+
+Here is how to do a similar workflow with the data and code from the book.
+
+```{r}
+
+# data
+library(rethinking)
+data(WaffleDivorce)
+d <- tibble(WaffleDivorce) %>%
+  mutate(D = standardize(Divorce)) %>%
+  mutate(M = standardize(Marriage)) %>%
+  mutate(A = standardize(MedianAgeMarriage))
+# model first
+m5.1 <- quap(
+  alist(
+    D ~ dnorm(mu, sigma),
+    mu <- a + bA * A,
+    a ~ dnorm(0, 0.2),
+    bA ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ),
+  data = d
+)
+
+# prior predictive simulation - accessing the priors assigned
+
+set.seed(10)
+View(prior)
+prior <- extract.prior(m5.1, 1000)
+mu <- link(m5.1, post = prior, data = list(A = c(-2, 2)))
+plot(NULL, xlim = c(-2, 2), ylim = c(-2, 2), xlab = "Median age marriage (std)", ylab = "Divorce rate (std)")
+for (i in 1:50) lines(c(-2, 2), mu[i, ], col = col.alpha("black", 0.4))
+
+# posterior predictions
+A_seq <- seq(from = -3, to = 3.2, length.out = 30)
+mu <- link(m5.1, data = list(A = A_seq))
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- sapply(A_seq, function(x) PI(prior[["a"]] + prior[["bA"]] * x))
+# plot it all
+plot(D ~ A, data = d, col = rangi2)
+lines(A_seq, mu.mean, lwd = 2)
+shade(mu.PI, A_seq)
+```
+
+# Chapter 5
+
+Let's try to approx the posterior of a multiple regression: chapter 5
+
+```{r}
+m5.3 <- quap(
+  alist(
+    D ~ dnorm(mu, sigma),
+    mu <- a + bM * M + bA * A,
+    a ~ dnorm(0, 0.2),
+    bM ~ dnorm(0, 0.5),
+    bA ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ),
+  data = d
+)
+
+# always take draws from the posterior
+post <- tidy_draws(m5.3, n = 1e4) %>%
+  select(a, bM, bA)
+# here we are setting up for our coefficient plot, see page 22 in notes to
+# understand how to read a plot... usually we plot different models together to compare
+long_post <- post %>%
+  pivot_longer(everything(),
+    names_to = "term",
+    values_to = "values"
+  )
+
+postsum <- long_post %>%
+  group_by(term) %>%
+  summarize(
+    mean = mean(values),
+    lb = quantile(values, .055),
+    ub = quantile(values, .945)
+  )
+
+
+# here is how to plot a coeff plot
+ggplot(
+  postsum,
+  aes(mean, term,
+    xmin = lb,
+    xmax = ub
+  )
+) +
+  geom_point(size = 2) +
+  geom_linerange(size = 1) +
+  geom_vline(
+    xintercept = 0,
+    color = "gray"
+  ) +
+  theme(legend.position = "none") +
+  xlim(-2, 2) +
+  labs(
+    x = "Estimate",
+    y = ""
+  )
+```
+
+
+Let's look at counter-factual plots
+
+
+```{r}
+m5.3_A <- quap(
+  alist(
+    ## A->D<-M
+    D ~ dnorm(mu, sigma),
+    mu <- a + bM * M + bA * A,
+    a ~ dnorm(0, 0.2),
+    bM ~ dnorm(0, 0.5),
+    bA ~ dnorm(0, 0.5),
+    sigma ~ dexp(1),
+    ## A->M
+    M ~ dnorm(mu_M, sigma_M),
+    mu_M <- aM + bAM * A,
+    aM ~ dnorm(0, 0.2),
+    bAM ~ dnorm(0, 0.5),
+    sigma_M ~ dexp(1)
+  ),
+  data = d
+)
+```
+
+
+Let's test out WAIC and PSIS to make sure we know how to use it. 
+These are ways to measure uncertainty. So, the smaller the better.
+```{r}
+
+WAIC(m5.3)
+# to see at each point, add this
+WAIC(m5.3, pointwise = TRUE)
+PSIS(m5.3)
+# to see at each point, add this
+PSIS(m5.3, pointwise = TRUE)
+```
+
+
+
+Let's try MCMC
+
+```{r}
+
+# install.packages("remotes")
+remotes::install_github("stan-dev/cmdstanr")
+install_cmdstan()
+library(cmdstanr)
+
+# data was standardized (tranformed above)
+# now I am selecting what I need from the data for my model
+d <- d %>%
+  select(D, A, M)
+View(d)
+
+# creating inner workings of model
+f <- alist(
+  D ~ dnorm(mu, sigma),
+  mu <- a + bM * M + bA * A,
+  a ~ dnorm(0, 0.2),
+  bM ~ dnorm(0, 0.5),
+  bA ~ dnorm(0, 0.5),
+  sigma ~ dexp(1)
+)
+# running with ulam
+mHMC <- ulam(f,
+  data = d, chains = 4, cores = 4
+)
+precis(mHMC)
+show(mHMC)
+pairs(mHMC)
+traceplot(mHMC)
+trankplot(mHMC)
+```
+
+
+```{r}
+# data, start by transforming any variables needed
+data(rugged)
+d2 <- rugged
+d2$log_gdp <- log(d2$rgdppc_2000)
+dd <- d2[complete.cases(d2$rgdppc_2000), ]
+dd$log_gdp_std <- dd$log_gdp / mean(dd$log_gdp)
+dd$rugged_std <- dd$rugged / max(dd$rugged)
+dd$cid <- ifelse(dd$cont_africa == 1, 1, 2)
+
+# then slim data down to only what you need
+dat_slim <- list(
+  log_gdp_std = dd$log_gdp_std,
+  rugged_std = dd$rugged_std,
+  cid = as.integer(dd$cid)
+)
+str(dat_slim)
+
+# lastly run model
+
+m9.1 <- ulam(
+  alist(
+    log_gdp_std ~ dnorm(mu, sigma),
+    mu <- a[cid] + b[cid] * (rugged_std - 0.215),
+    a[cid] ~ dnorm(1, 0.1),
+    b[cid] ~ dnorm(0, 0.3),
+    sigma ~ dexp(1)
+  ),
+  data = dat_slim, chains = 4, cores = 4, control = list(adapt_delta = 0.99)
+)
+
+precis(m9.1, depth = 2)
+trankplot(m9.1)
+pairs(m9.1@stanfit)
+```
+
+Let's look at a model with extremely flat priors and see the errors
+
+```{r}
+y <- c(-1, 1)
+set.seed(11)
+m9.2 <- ulam(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu <- alpha,
+    alpha ~ dnorm(0, 1000),
+    sigma ~ dexp(0.0001)
+  ),
+  data = list(y = y), chains = 3
+)
+
+precis(m9.2)
+
+# trying option one from warning messages
+m9.2 <- ulam(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu <- alpha,
+    alpha ~ dnorm(0, 1000),
+    sigma ~ dexp(0.0001)
+  ),
+  data = list(y = y), chains = 3, control = list(adapt_delta = 0.99)
+)
+# trying option 2 from warning messages
+pairs(m9.2@stanfit)
+# look at how skewed these are....
+
+
+# now lets look at the traceplots
+
+traceplot(m9.2)
+
+# they do not look anything alike... which shows us that they are not a healthy pair of chains
+```
+
+This is not what we expected, the variation is insane and our alpha should be around 0!
+
+Notice the warning messages
+Warning messages:
+1: There were 47 divergent transitions after warmup. See
+https://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup
+to find out why this is a problem and how to eliminate them. 
+2: Examine the pairs() plot to diagnose sampling problems
+
+
+Let's work on how to plot an interaction
+
+```{r}
+library(gssr)
+
+gss96 <- gss_get_yr(1996)
+glimpse(gss96)
+
+a <- tibble(gss96) %>%
+  select(rincome, usfrustr, race) %>%
+  drop_na()
+
+a <- a %>%
+  mutate(race = ifelse(race == 1, 1, 2)) %>% # create white and non-white
+  mutate(logrinc = log(rincome)) %>%
+  mutate(F = usfrustr)
+
+
+r <- quap(
+  alist(
+    F ~ dnorm(mu, sigma),
+    mu <- a[race] + b[race] * (logrinc),
+    a[race] ~ dnorm(1, 0.1),
+    b[race] ~ dnorm(0, 0.3),
+    sigma ~ dexp(1)
+  ),
+  data = a
+)
+# get summary of model
+precis(r, 2)
+# check uncertainty
+WAIC(r)
+PSIS(r)
+
+library(sjPlot)
+library(ggplot2)
+# this is how to plot an interaction
+m2 <- lm(F ~ logrinc * race, data = a)
+install.packages("sjPlot")
+plot_model(m2, type = "int")
+```
+
+
+Also, you will need to know how to do a trankplot
+
+```{r}
+library(bayesplot)
+library(aptheme)
+library(rethinking)
+y <- (c(-2, 2))
+
+# now we can create our models,
+# I will create one with extremely flat priors first
+# to show a malfunctioning Markov chain
+set.seed(1101)
+p <- ulam(
+  alist(
+    y ~ dnorm(mu, sigma),
+    mu <- a,
+    a ~ dnorm(0, 1000),
+    sigma ~ dexp(0.0001)
+  ),
+  data = list(y = y), chains = 3, cores = 3
+)
+
+precis(p)
+# this is not good, we made our a centered on 0 and it is no where near that
+# also the sigma looks insane
+
+# let's make a trace plot
+
+traceplot(p)
+
+# get the stan code from the ulam model
+model_stan <- stancode(p)
+# fit the model in stan
+model_fit <- stan(model_code = model_stan, data = list(y = y))
+# then to make the trank plot use this code
+mcmc_rank_overlay(model_fit) + theme_ap(family = "")
+```
+
+
+# Chapter 11\
+
+```{r}
+library(tidyverse)
+library(gssr)
+```
+
+
+Messing with the data. 
+
+```{r}
+
+# get year 2018
+d <- gss_get_yr(2018)
+
+# manipulate for what you want
+ds <- d %>%
+  select(pres16, educ, sex) %>%
+  drop_na() %>%
+  filter(pres16 == 1 | pres16 == 2) %>%
+  mutate(
+    trump = ifelse(pres16 == 2, 1L, 0L),
+    female = ifelse(sex == 2, 1L, 0L)
+  ) %>%
+  select(trump, female, educ) %>%
+  mutate(male = 1 - female)
+```
+
+
+Using GLM. 
+
+```{r}
+# with female
+m1 <- glm(trump ~ educ + female,
+  data = ds,
+  family = binomial(link = "logit")
+)
+
+# with male
+m2 <- glm(trump ~ educ + male,
+  data = ds,
+  family = binomial(link = "logit")
+)
+# looking at it
+
+summary(m1)
+summary(m2)
+```
+
+Coefficients:
+            Estimate Std. Error z value Pr(>|z|)    
+(Intercept)  0.80867    0.30231   2.675  0.00747 ** 
+educ        -0.05590    0.02037  -2.744  0.00608 ** 
+female      -0.54480    0.11176  -4.875 1.09e-06 ***
+
+The results are in log-odds. \
+
+INTERPRETATION:\
+"Each additional year of education reduces the log-odds by 0.06."\
+
+
+EXAMPLE:\
+What is the expected value for a male with 0 years of education?\
+
+The model thinks a male with 0 years of education's log odds of voting for trump are 0.81.\
+```{r}
+0.80867 - 0.05590 * 0 - 0.54480 * 0
+```
+
+
+How do we get to a probability?\
+
+```{r}
+(exp(0.80867) / (1 + exp(0.80867)))
+```
+
+The model thinks that a male with 0 years of education has a 69% probability of voting for trump.
+
+Now the man has 20 years of education. What are his log odds?
+
+```{r}
+0.80867 - 0.05590 * 20 - 0.54480 * 0
+```
+
+He has a log odds of -0.30933. 
+
+Now, let's make it a probability. 
+
+```{r}
+(exp(-0.30933) / (1 + exp(-0.30933)))
+```
+
+The model thinks that a male with 20 years of education has a 42% chance of voting for trump. 
+
+can do it with confidence intervals.
+
+```{r}
+broom::tidy(m1, conf.int = TRUE)
+```
+
+
+When education increases by one unit you can expect the log-odds of voting for trump to be between -0.096 and - 0.016. 
+
+What's the probability of a female respondent with 12 years of education. 
+
+```{r}
+0.80867 - 0.05590 * 12 - 0.54480 * 1
+```
+
+The model thinks a female with 12 years of education has log odds of voting for trump of -0.40693
+
+Now to probability
+```{r}
+(exp(-0.40693) / (1 + exp(-0.40693)))
+```
+
+
+
+
+
+
+Example 2: 
+
+a man with 0 years of education and a man with 1 year of education
+
+```{r}
+# 0 years
+z_log <- 0.80867 - 0.05590 * 0 - 0.54480 * 0
+
+# now probability
+z_prob <- (exp(z_log) / (1 + exp(z_log)))
+# 1 year
+o_log <- 0.80867 - 0.05590 * 1 - 0.54480 * 0
+
+o_prob <- (exp(o_log) / (1 + exp(o_log)))
+
+# difference
+
+o_prob - z_prob
+```
+
+- 0.012044 -> - 1.2 percent
+
+
+Example 3: 
+
+a man with 19 years of education and a man with 20 year of education
+
+```{r}
+# 19 years
+n_log <- 0.80867 - 0.05590 * 19 - 0.54480 * 0
+
+# now probability
+n_prob <- (exp(n_log) / (1 + exp(n_log)))
+
+# 20 year
+t_log <- 0.80867 - 0.05590 * 20 - 0.54480 * 0
+
+t_prob <- (exp(t_log) / (1 + exp(t_log)))
+
+# difference
+
+t_prob - n_prob
+```
+- 0.0137011 -> - 1.4 percent; notice that its not consistent... the closer to 50% the bigger difference it makes (remember the S-curve)
+
+
+
+Male vs. female voting for trump at 12 years of education
+
+```{r}
+# 12 years, female
+f_log <- 0.80867 - 0.05590 * 12 - 0.54480 * 1
+
+# now probability
+f_prob <- (exp(f_log) / (1 + exp(f_log)))
+
+# 12 years, male
+m_log <- 0.80867 - 0.05590 * 12 - 0.54480 * 0
+
+m_prob <- (exp(m_log) / (1 + exp(m_log)))
+
+# difference
+
+m_prob - f_prob
+```
+0.1347645 -> 1.34 %
+
+
+Alex: "What's the effect of education?" 
+
+(1) odds ratio
+
+```{r}
+broom::tidy(m1, exponentiate = TRUE)
+```
+# A tibble: 3 × 5
+  term        estimate std.error statistic    p.value
+  <chr>          <dbl>     <dbl>     <dbl>      <dbl>
+1 (Intercept)    2.24     0.302       2.67 0.00747   
+2 educ           0.946    0.0204     -2.74 0.00608   
+3 female         0.580    0.112      -4.87 0.00000109
+
+
+odd-ratio -> "a female respondents for voting for trump's odds are 0.580 times male respondent's odds."
+
+
+(2) marginal effects
+```{r}
+library(marginaleffects)
+
+marginaleffects(m1,
+  newdata = ds
+)
+
+
+ggeffects::ggpredict(m2, terms = c("educ [0,100]", "male")) %>%
+  plot()
+```
