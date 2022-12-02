@@ -1,0 +1,232 @@
+---
+title: "GSS Stats 722 Final"
+output:
+  html_document: default
+  pdf_document: default
+date: "2022-11-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Dear Nico, 
+
+I hope you enjoy this. lol. 
+
+Estimand: What is the total effect of party identification on your trust in cops?\
+
+```{r}
+library(gssr)
+library(rethinking)
+library(tidybayes.rethinking)
+library(tidybayes)
+library(tidyverse)
+
+
+# get data
+d <- gss_get_yr(2006)
+dd <- d %>% 
+  select(acqprisn, partyid, trtcops, race, sex, rincome) %>% 
+  drop_na() 
+
+# clean data
+
+dd <- dd %>% 
+  filter(partyid != 7) %>% # simplifying, taking out "other"
+  mutate(female = if_else(sex == 2, 1L, 0L),
+         partyid = case_when( 
+            # I changed it to be this way from doing it where I
+           # just add one because I wantd to see if it would help me when 
+           # trying to make a plot... it did not lol
+           partyid == 0 ~ 1,
+           partyid == 1 ~ 2,
+           partyid == 2 ~ 3, 
+           partyid == 3 ~ 4,
+           partyid == 4 ~ 5,
+           partyid == 5 ~ 6,
+           partyid == 6 ~ 7, 
+         ), 
+         black = if_else(race == 2, 1L, 0L),
+         trtcops = if_else(trtcops == 1, 0L, 1L)) %>% 
+  select(-race, - sex) 
+# leaving income alone because its not numeric so not logging values
+         
+glimpse(dd)
+View(dd)
+
+             
+```
+
+Create DAG. \
+
+```{r}
+library(dagitty)
+library(ggdag)
+dag_coords <-
+  tibble(
+    name = c("P", "I", "S", "R", "A", "T"),
+    y = c(3, 4, 1, 1, 1, 3),
+    x = c(1, 4, 3, 2, 6, 5 )
+  )
+
+p1 <-
+  dagify(T ~ P, T ~ I, T ~ A, T ~ S, T ~ R, P ~ R, P ~ S, I ~ S, 
+    coords = dag_coords
+  ) %>%
+  ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_dag_point(color = "blue4", alpha = 1 / 4, size = 10) +
+  geom_dag_text(color = "cornflowerblue") +
+  geom_dag_edges(edge_color = "blue4") +
+  scale_x_continuous(NULL, breaks = NULL, expand = c(0.1, 0.1)) +
+  scale_y_continuous(NULL, breaks = NULL, expand = c(0.2, 0.2)) +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  labs(
+    title = "DAG showing causal relationship",
+    subtitle = paste0("between party identification (P), race (R), sex (S),",
+                      "Income (i), acquaintances in prison (A),
+                      and trust in cops (T)"))
+
+p1
+```
+
+I recreated the DAG I made in daggity.net. I will only condition on race and sex (the confounding variables that may create a spurious relationship).\
+
+
+Now we will create a model and choose priors here. \
+
+$$
+\begin{align}
+T &\sim Normal(\mu, \sigma) \\
+\mu &= \alpha +\beta_{[partyid]}i + \beta_F * F_i + \beta_B * B_i \\
+\alpha &\sim Normal(0.60, 0.05) \\
+\beta_{partyid} &\sim Normal(0,0.5) \\
+\beta_F &\sim Normal(0, 0.05) \\
+\beta_B &\sim Normal(0, 0.1) \\
+\sigma &\sim Exponential(1)
+\end{align}
+$$
+
+```{r}
+set.seed(1201)
+flist <- alist(
+  trtcops ~ dnorm(mu, sigma), 
+  mu <- a + bP[partyid] + bF * female  + bB * black,
+  a ~ dnorm (.60, .05), 
+  # I made trtcops 0/1 to use percentage points
+  # 0 = don't trust cops, 1 = trust some amount of cops
+  # very high percent of "typical"white men will trust cops
+  bP[partyid] ~ dnorm(0, 0.5),
+  # I expect the difference between partyid to be one of the highest
+  bF ~  dnorm(0, .05), 
+  # women are likely someone more likely to trust cops more than men
+  bB ~ dnorm(0, .1),
+  # non-white people are slightly less likely to trtops
+  sigma ~ dexp(1)
+)
+```
+
+Next, we will run a prior predictive simulation like we did in class. We are going to take the real data, and simulate trust in cops (our outcome).  
+
+```{r}
+ppsims <- dd %>% 
+  select(female, black) %>% 
+  uncount(100) %>% 
+  rowwise() %>% 
+  # do this separately for every row, a different random number for every row
+  # this will be the same as our equation above, but with simulated stuff
+  mutate(sim_trtcops = rnorm(1, 0.60, 0.05) +  #a
+          rnorm(1, 0, .15) + # partyid
+           rnorm(1, 0, .05) * female +  # bF
+           rnorm(1, 0, .1) * black) # bB
+
+# plot the simulated outcome
+hist(ppsims$sim_trtcops)
+```
+
+That looks pretty good. I'm not sure how to tell when the outcome here is acceptable, but it mirrors what I would have expected based on my priors. Nothing is really below zero or above one and the highest density amount of information falls within 0.5 and approx. .75. This makes sense to me as I believe most people have a general trust in cops. \
+
+Lastly, I will create the model and finally look at the coeff plot and compare the different effects. 
+
+```{r}
+m1 <- quap(flist, data = dd)
+
+precis(m1, depth = 2)
+
+# always take draws from the posterior
+post <- tidy_draws(m1, n = 1e4) %>%
+  select(-sigma, -.chain, -.iteration, -.draw)
+# here we are setting up for our coefficient plot, see page 22 in notes to
+# understand how to read a plot... usually we plot different models together to compare
+long_post <- post %>%
+  pivot_longer(everything(),
+    names_to = "term",
+    values_to = "values"
+  )
+
+postsum <- long_post %>%
+  group_by(term) %>%
+  summarize(
+    mean = mean(values),
+    lb = quantile(values, .055),
+    ub = quantile(values, .945)
+  )
+
+
+# here is how to plot a coeff plot
+ggplot(
+  postsum,
+  aes(mean, term,
+    xmin = lb,
+    xmax = ub
+  )
+) +
+  geom_point(size = 2) +
+  geom_linerange(size = 1) +
+  geom_vline(
+    xintercept = 0,
+    color = "gray"
+  ) +
+  theme(legend.position = "none") +
+  xlim(-2, 2) +
+  labs(
+    x = "Estimate",
+    y = "",
+    title = "Coefficient Estimates for each Beta Value"
+  )
+```
+
+
+bB (race) is not associated with trust in cops. bF (sex) also has a small, almost minimal negative association with trust in cops*. bP[1-3] are all levels of democrats (including independent close to democrat) and they all seem to have a negative association with trust in cops. bP[4] is straight independent and this is also negatively associated with trust in cops. bP[5] is independent but close to republican and this has almost no affect on trust in cops; however it does have a small negative association. bP[6] is not very strong republican and has a slightly higher negative association to trust in cops than those who are independent, close to republican. What's interesting is that this is the inverse pattern to what occurs with bP[2], people who identify as not very strongly democrat actually have a less of a negative association with trust in cops than those who are strong democrats and those who identify as independent but close to democrat. bP[7] is strong republicans, and here we see the only party identification that has a positive association with trust in cops. 
+
+* I do have a question here though, I thought if we controlled for it the effect would become 0. Why did it not become 0 completely like Black did? Is that not what controllng for something does?
+ 
+ 
+Now I will attempt to run a linear regression with my data to create the other graph we did in class. I am not sure if having a coeff plot is enough... I realized I don't know if a coeff plot ACTUALLY answers my original estimand. I'm not sure at what point I have enough information to address my estimand. Interesting. Hopefully you can help me with this. :) <3
+
+
+```{r}
+m2 <- lm(trtcops ~ partyid + female + black, data = dd)
+library(sjPlot)
+library(car)
+library(ggplot2)
+plot_model(m2, type = "diag")
+plot_model(m2, type = "est")
+plot_model(m2, type = "est")
+```
+
+ 
+Well... I have some issues with this and I don't know why. 
+
+1) Why is `black` now a positive small effect when in the model it's 0.
+2) Why is there only one `partyid` effect?
+
+
+I can't figure out how to make `partyid` an index variable inside of the `lm` function. Should I have stopped at the coeff plots? Also, I don't know what the other plots (besides the one that looks like a coeff plot) is showing me but I wanted to see if i could graph SOMETHING. :'(
+
+Well, sorry for the let down here at the end. I did my best. :) Looking forward to some feedback.
+
+Safe travels and good luck on your next endeavors <3
+
+- Ally
